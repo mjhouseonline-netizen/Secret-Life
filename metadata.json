@@ -1,0 +1,8 @@
+{
+  "name": "The Secret Life Of Your Pet",
+  "description": "An AI-powered creative suite for generating cinematic posters, multi-panel comic strips, and professional video animations for pets and people using Gemini 3 and Veo.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ]
+}

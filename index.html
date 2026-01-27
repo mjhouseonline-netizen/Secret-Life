@@ -1,0 +1,92 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
+  <title>The Secret Life Of Your Pet - AI Studio</title>
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Secret Life">
+  <link rel="manifest" href="manifest.json">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://js.stripe.com/v3/"></script>
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+  <link href="https://fonts.googleapis.com/css2?family=Bangers&family=Comic+Neue:wght@400;700&family=Bebas+Neue&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --sat: env(safe-area-inset-top);
+      --sar: env(safe-area-inset-right);
+      --sab: env(safe-area-inset-bottom);
+      --sal: env(safe-area-inset-left);
+      --comic-yellow: #fde047;
+      --comic-cyan: #22d3ee;
+      --comic-magenta: #d946ef;
+      --comic-black: #000000;
+    }
+    body {
+      font-family: 'Comic Neue', cursive;
+      background-color: #09090b; /* Deep Zinc Dark */
+      color: #fff;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+      touch-action: manipulation;
+      background-image: radial-gradient(rgba(255,255,255,0.05) 1px, transparent 0);
+      background-size: 24px 24px;
+    }
+    .font-cinematic {
+      font-family: 'Bebas Neue', sans-serif;
+    }
+    .font-comic {
+      font-family: 'Bangers', cursive;
+      letter-spacing: 0.05em;
+    }
+    .safe-top { padding-top: var(--sat); }
+    .safe-bottom { padding-bottom: var(--sab); }
+    .safe-pb-nav { padding-bottom: calc(var(--sab) + 4rem); }
+    
+    .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+    .custom-scrollbar::-webkit-scrollbar-track { background: #09090b; }
+    .custom-scrollbar::-webkit-scrollbar-thumb { background: #27272a; border-radius: 0; }
+    
+    .comic-card {
+      background: #18181b;
+      border: 3px solid #000;
+      box-shadow: 6px 6px 0px 0px #000;
+      transition: all 0.2s ease-in-out;
+    }
+    .comic-card:hover {
+      transform: translate(-1px, -1px);
+      box-shadow: 8px 8px 0px 0px #000;
+    }
+    .halftone {
+      position: relative;
+    }
+    .halftone::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background-image: radial-gradient(#fff 1px, transparent 0);
+      background-size: 4px 4px;
+      opacity: 0.03;
+      pointer-events: none;
+    }
+    .stroke-white-thin { -webkit-text-stroke: 1px white; }
+    .stroke-black-bold { -webkit-text-stroke: 2px black; }
+  </style>
+<script type="importmap">
+{
+  "imports": {
+    "react-dom/": "https://esm.sh/react-dom@^19.2.4/",
+    "react/": "https://esm.sh/react@^19.2.4/",
+    "react": "https://esm.sh/react@^19.2.4",
+    "@google/genai": "https://esm.sh/@google/genai@^1.38.0",
+    "@stripe/stripe-js": "https://esm.sh/@stripe/stripe-js@^4.0.0"
+  }
+}
+</script>
+</head>
+<body>
+  <div id="root"></div>
+</body>
+</html>
