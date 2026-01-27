@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Layout } from './components/Layout';
 import { ApiKeyGuard } from './components/ApiKeyGuard';
 import { Auth } from './components/Auth';
@@ -18,6 +18,7 @@ import { SettingsStudio } from './components/SettingsStudio';
 import { PerformanceAnalytics } from './components/PerformanceAnalytics';
 import { AppView, GeneratedContent, User, PosterTemplate, UserSettings } from './types';
 import { CloudService } from './services/cloud';
+import { storageService } from './services/storage';
 
 const CREDIT_COSTS: Record<string, number> = {
   poster: 5,
@@ -37,16 +38,49 @@ const App: React.FC = () => {
   const [user, setUser] = useState<User | null>(null);
   const [activeDraft, setActiveDraft] = useState<PosterTemplate | null>(null);
   const [syncingCount, setSyncingCount] = useState(0);
+  const [isLoadingHistory, setIsLoadingHistory] = useState(true);
+
+  // Load history from IndexedDB
+  const loadHistory = useCallback(async () => {
+    try {
+      setIsLoadingHistory(true);
+
+      // First, try to migrate any existing localStorage data
+      const migrated = await storageService.migrateFromLocalStorage();
+      if (migrated > 0) {
+        console.log(`Migrated ${migrated} items from localStorage to IndexedDB`);
+      }
+
+      // Load history with URLs from IndexedDB
+      const historyWithUrls = await storageService.getHistoryWithUrls();
+      setHistory(historyWithUrls);
+    } catch (error) {
+      console.error('Failed to load history from IndexedDB:', error);
+      // Fallback to localStorage if IndexedDB fails
+      const savedHistory = localStorage.getItem('cinepet_history');
+      if (savedHistory) {
+        setHistory(JSON.parse(savedHistory));
+      }
+    } finally {
+      setIsLoadingHistory(false);
+    }
+  }, []);
 
   useEffect(() => {
     const savedUser = localStorage.getItem('cinepet_current_user');
     if (savedUser) {
       setUser(JSON.parse(savedUser));
     }
-    const savedHistory = localStorage.getItem('cinepet_history');
-    if (savedHistory) {
-      setHistory(JSON.parse(savedHistory));
-    }
+    loadHistory();
+
+    // Cleanup object URLs when component unmounts
+    return () => {
+      history.forEach(item => {
+        if (item.url.startsWith('blob:')) {
+          URL.revokeObjectURL(item.url);
+        }
+      });
+    };
   }, []);
 
   const handleLogin = (u: User) => {
@@ -60,10 +94,14 @@ const App: React.FC = () => {
     setActiveView('poster');
   };
 
-  const handleDeleteAccount = () => {
+  const handleDeleteAccount = async () => {
+    // Clear IndexedDB
+    await storageService.clearAll();
+    // Clear localStorage
     localStorage.removeItem('cinepet_history');
     localStorage.removeItem('cinepet_poster_templates');
     localStorage.removeItem('cinepet_voice_clones');
+    setHistory([]);
     handleLogout();
   };
 
@@ -99,32 +137,62 @@ const App: React.FC = () => {
     localStorage.setItem('cinepet_current_user', JSON.stringify(updatedUser));
   };
 
+  // Cloud Provider Update Handler
+  const handleUpdateCloudProvider = (provider: 'google' | 'icloud' | 'none', accessToken?: string) => {
+    if (!user) return;
+    const updatedUser = {
+      ...user,
+      cloudProvider: provider,
+      cloudAccessToken: provider === 'google' ? accessToken : undefined
+    };
+    updateUserState(updatedUser);
+
+    // Also update in users list
+    const usersJson = localStorage.getItem('cinepet_users');
+    if (usersJson) {
+      const users = JSON.parse(usersJson);
+      const updatedUsers = users.map((u: any) =>
+        u.id === user.id ? { ...u, cloudProvider: provider, cloudAccessToken: accessToken } : u
+      );
+      localStorage.setItem('cinepet_users', JSON.stringify(updatedUsers));
+    }
+  };
+
   // Cloud Sync Handler
   const syncToCloud = async (content: GeneratedContent) => {
     if (!user || user.cloudProvider === 'none') return;
-    
+
+    // For iCloud, we don't auto-sync - user triggers via Share button
+    if (user.cloudProvider === 'icloud') return;
+
     setSyncingCount(prev => prev + 1);
     try {
-      let cloudUrl = '';
-      if (user.cloudProvider === 'google' && user.cloudAccessToken) {
-        const mimeType = content.type === 'video' ? 'video/mp4' : 'image/png';
-        cloudUrl = await CloudService.uploadToGoogleDrive(
-          user.cloudAccessToken,
-          content.url,
-          `SecretLife_${content.type}_${content.id}.png`,
-          mimeType
-        );
-      } else if (user.cloudProvider === 'icloud') {
-        cloudUrl = await CloudService.uploadToICloud(`SecretLife_${content.type}_${content.id}.png`);
-      }
+      const mimeType = content.type === 'video' ? 'video/mp4' : 'image/png';
+      const extension = content.type === 'video' ? 'mp4' : 'png';
+      const fileName = `SecretLife_${content.type}_${content.id}.${extension}`;
 
-      setHistory(prev => {
-        const updated = prev.map(item => 
-          item.id === content.id ? { ...item, cloudSynced: true, cloudUrl } : item
-        );
-        localStorage.setItem('cinepet_history', JSON.stringify(updated));
-        return updated;
-      });
+      const result = await CloudService.uploadToCloud(
+        user.cloudProvider,
+        user.cloudAccessToken,
+        content.url,
+        fileName,
+        mimeType
+      );
+
+      if (result.success && result.url) {
+        // Update IndexedDB
+        await storageService.updateHistory(content.id, { cloudSynced: true, cloudUrl: result.url });
+        // Update state
+        setHistory(prev => prev.map(item =>
+          item.id === content.id ? { ...item, cloudSynced: true, cloudUrl: result.url } : item
+        ));
+      } else if (result.error) {
+        console.error('Cloud Sync Failed:', result.error);
+        // If token expired, clear the cloud provider
+        if (result.error.includes('expired')) {
+          handleUpdateCloudProvider('none');
+        }
+      }
     } catch (error) {
       console.error('Cloud Sync Failed:', error);
     } finally {
@@ -132,16 +200,32 @@ const App: React.FC = () => {
     }
   };
 
-  const handleNewContent = (content: GeneratedContent, skipSwitch = false) => {
+  const handleNewContent = async (content: GeneratedContent, skipSwitch = false) => {
     const cost = CREDIT_COSTS[content.type] || 0;
     if (deductCredits(cost)) {
       const newContent = { ...content, cloudSynced: false };
-      setHistory(prev => {
-        const updated = [newContent, ...prev];
-        localStorage.setItem('cinepet_history', JSON.stringify(updated));
-        return updated;
-      });
-      
+
+      // Save to IndexedDB
+      try {
+        await storageService.saveMedia(content.id, content.url, {
+          type: content.type,
+          prompt: content.prompt,
+          timestamp: content.timestamp,
+          metadata: content.metadata,
+          cloudSynced: false
+        });
+
+        // Get object URL for display
+        const objectUrl = await storageService.getMediaObjectUrl(content.id);
+        const contentWithObjectUrl = { ...newContent, url: objectUrl || content.url };
+
+        setHistory(prev => [contentWithObjectUrl, ...prev]);
+      } catch (error) {
+        console.error('Failed to save to IndexedDB:', error);
+        // Fallback: just use the content as-is
+        setHistory(prev => [newContent, ...prev]);
+      }
+
       // Auto-sync to cloud if enabled
       if (user?.settings?.autoCloudSync || user?.cloudProvider !== 'none') {
         syncToCloud(newContent);
@@ -213,9 +297,10 @@ const App: React.FC = () => {
         return <DistributionStudio />;
       case 'settings':
         return (
-          <SettingsStudio 
-            user={user} 
-            onUpdateSettings={handleUpdateSettings} 
+          <SettingsStudio
+            user={user}
+            onUpdateSettings={handleUpdateSettings}
+            onUpdateCloudProvider={handleUpdateCloudProvider}
             onLogout={handleLogout}
             onDeleteAccount={handleDeleteAccount}
           />
@@ -237,11 +322,18 @@ const App: React.FC = () => {
                   </div>
                 )}
               </div>
-              <button 
-                onClick={() => {
+              <button
+                onClick={async () => {
                   if(confirm('Clear all archives?')) {
+                    // Revoke all object URLs
+                    history.forEach(item => {
+                      if (item.url.startsWith('blob:')) {
+                        URL.revokeObjectURL(item.url);
+                      }
+                    });
+                    // Clear IndexedDB
+                    await storageService.clearAll();
                     setHistory([]);
-                    localStorage.removeItem('cinepet_history');
                   }
                 }}
                 className="px-4 py-2 text-xs font-black uppercase tracking-widest text-zinc-600 hover:text-red-400 transition-colors"
@@ -250,7 +342,12 @@ const App: React.FC = () => {
               </button>
             </div>
 
-            {history.length === 0 ? (
+            {isLoadingHistory ? (
+              <div className="flex flex-col items-center justify-center py-32 text-center">
+                <div className="w-12 h-12 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin mb-4"></div>
+                <p className="text-zinc-500 text-xs uppercase font-bold">Loading Archives...</p>
+              </div>
+            ) : history.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-32 text-center bg-zinc-900/10 border-2 border-dashed border-zinc-800/50 rounded-[2.5rem]">
                 <h3 className="text-xl font-black mb-2 text-white uppercase tracking-widest">Archives Empty</h3>
                 <p className="text-zinc-500 text-xs mb-8 uppercase font-bold">Ready to start the next production?</p>
@@ -298,21 +395,44 @@ const App: React.FC = () => {
                                VIEW
                              </a>
                            )}
-                           <button 
+                           <button
                             onClick={async () => {
                                try {
-                                 const res = await fetch(item.url);
-                                 // Cast to any to fix environments where res.blob() returns Promise<unknown>
-                                 const blob: any = await res.blob();
-                                 const file = new File([blob], `secretlife-${item.id}.png`, { type: blob.type });
-                                 if (navigator.share) {
+                                 // Get blob from IndexedDB for sharing
+                                 const blob = await storageService.getMediaBlob(item.id);
+                                 if (!blob) {
+                                   // Fallback to fetching URL
+                                   const res = await fetch(item.url);
+                                   const fetchedBlob: any = await res.blob();
+                                   const file = new File([fetchedBlob], `secretlife-${item.id}.${item.type === 'video' ? 'mp4' : 'png'}`, { type: fetchedBlob.type });
+                                   if (navigator.share && navigator.canShare?.({ files: [file] })) {
+                                     await navigator.share({ files: [file], title: 'My Secret Life Masterpiece', text: item.prompt });
+                                   } else {
+                                     throw new Error('Share not supported');
+                                   }
+                                   return;
+                                 }
+
+                                 const ext = item.type === 'video' ? 'mp4' : 'png';
+                                 const file = new File([blob], `secretlife-${item.id}.${ext}`, { type: blob.type });
+
+                                 if (navigator.share && navigator.canShare?.({ files: [file] })) {
                                    await navigator.share({
                                      files: [file],
                                      title: 'My Secret Life Masterpiece',
                                      text: item.prompt
                                    });
+                                 } else {
+                                   // Download fallback
+                                   const url = URL.createObjectURL(blob);
+                                   const a = document.createElement('a');
+                                   a.href = url;
+                                   a.download = `secretlife-${item.id}.${ext}`;
+                                   a.click();
+                                   URL.revokeObjectURL(url);
                                  }
                                } catch (e) {
+                                 // Final fallback
                                  const a = document.createElement('a');
                                  a.href = item.url;
                                  a.download = `secretlife-${item.id}`;
