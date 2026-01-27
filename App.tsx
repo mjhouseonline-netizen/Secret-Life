@@ -99,32 +99,63 @@ const App: React.FC = () => {
     localStorage.setItem('cinepet_current_user', JSON.stringify(updatedUser));
   };
 
+  // Cloud Provider Update Handler
+  const handleUpdateCloudProvider = (provider: 'google' | 'icloud' | 'none', accessToken?: string) => {
+    if (!user) return;
+    const updatedUser = {
+      ...user,
+      cloudProvider: provider,
+      cloudAccessToken: provider === 'google' ? accessToken : undefined
+    };
+    updateUserState(updatedUser);
+
+    // Also update in users list
+    const usersJson = localStorage.getItem('cinepet_users');
+    if (usersJson) {
+      const users = JSON.parse(usersJson);
+      const updatedUsers = users.map((u: any) =>
+        u.id === user.id ? { ...u, cloudProvider: provider, cloudAccessToken: accessToken } : u
+      );
+      localStorage.setItem('cinepet_users', JSON.stringify(updatedUsers));
+    }
+  };
+
   // Cloud Sync Handler
   const syncToCloud = async (content: GeneratedContent) => {
     if (!user || user.cloudProvider === 'none') return;
-    
+
+    // For iCloud, we don't auto-sync - user triggers via Share button
+    if (user.cloudProvider === 'icloud') return;
+
     setSyncingCount(prev => prev + 1);
     try {
-      let cloudUrl = '';
-      if (user.cloudProvider === 'google' && user.cloudAccessToken) {
-        const mimeType = content.type === 'video' ? 'video/mp4' : 'image/png';
-        cloudUrl = await CloudService.uploadToGoogleDrive(
-          user.cloudAccessToken,
-          content.url,
-          `SecretLife_${content.type}_${content.id}.png`,
-          mimeType
-        );
-      } else if (user.cloudProvider === 'icloud') {
-        cloudUrl = await CloudService.uploadToICloud(`SecretLife_${content.type}_${content.id}.png`);
-      }
+      const mimeType = content.type === 'video' ? 'video/mp4' : 'image/png';
+      const extension = content.type === 'video' ? 'mp4' : 'png';
+      const fileName = `SecretLife_${content.type}_${content.id}.${extension}`;
 
-      setHistory(prev => {
-        const updated = prev.map(item => 
-          item.id === content.id ? { ...item, cloudSynced: true, cloudUrl } : item
-        );
-        localStorage.setItem('cinepet_history', JSON.stringify(updated));
-        return updated;
-      });
+      const result = await CloudService.uploadToCloud(
+        user.cloudProvider,
+        user.cloudAccessToken,
+        content.url,
+        fileName,
+        mimeType
+      );
+
+      if (result.success && result.url) {
+        setHistory(prev => {
+          const updated = prev.map(item =>
+            item.id === content.id ? { ...item, cloudSynced: true, cloudUrl: result.url } : item
+          );
+          localStorage.setItem('cinepet_history', JSON.stringify(updated));
+          return updated;
+        });
+      } else if (result.error) {
+        console.error('Cloud Sync Failed:', result.error);
+        // If token expired, clear the cloud provider
+        if (result.error.includes('expired')) {
+          handleUpdateCloudProvider('none');
+        }
+      }
     } catch (error) {
       console.error('Cloud Sync Failed:', error);
     } finally {
@@ -213,9 +244,10 @@ const App: React.FC = () => {
         return <DistributionStudio />;
       case 'settings':
         return (
-          <SettingsStudio 
-            user={user} 
-            onUpdateSettings={handleUpdateSettings} 
+          <SettingsStudio
+            user={user}
+            onUpdateSettings={handleUpdateSettings}
+            onUpdateCloudProvider={handleUpdateCloudProvider}
             onLogout={handleLogout}
             onDeleteAccount={handleDeleteAccount}
           />

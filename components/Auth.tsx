@@ -1,6 +1,7 @@
 
 import React, { useState } from 'react';
 import { User } from '../types';
+import { CloudService } from '../services/cloud';
 
 interface AuthProps {
   onLogin: (user: User) => void;
@@ -124,19 +125,83 @@ export const Auth: React.FC<AuthProps> = ({ onLogin }) => {
     }
   };
 
-  const handleGoogleSignIn = () => {
+  const handleGoogleSignIn = async () => {
     setIsGoogleLoading(true);
-    setTimeout(() => {
-      onLogin({
-        id: 'google-' + Math.random().toString(36).substr(2, 9),
-        username: 'Studio Director',
-        email: 'director@gmail.com',
-        role: 'user',
-        credits: 100,
-        cloudProvider: 'google'
-      });
+    setError('');
+
+    try {
+      // Check if Google OAuth is configured
+      if (!CloudService.isGoogleConfigured()) {
+        setError('GOOGLE NOT CONFIGURED');
+        setIsGoogleLoading(false);
+        return;
+      }
+
+      // Initiate real OAuth flow
+      const authResult = await CloudService.initiateGoogleOAuth();
+
+      // Check if this user already exists
+      const usersJson = localStorage.getItem('cinepet_users');
+      const users: any[] = usersJson ? JSON.parse(usersJson) : [];
+      const existingUser = users.find(u => u.email?.toLowerCase() === authResult.user.email.toLowerCase());
+
+      const isAdmin = authResult.user.email.toLowerCase() === ADMIN_EMAIL;
+
+      if (existingUser) {
+        // Update existing user with new token
+        const updatedUser = {
+          ...existingUser,
+          cloudProvider: 'google',
+          cloudAccessToken: authResult.accessToken,
+          cloudTokenExpiry: authResult.expiresAt,
+          avatarUrl: authResult.user.picture || existingUser.avatarUrl
+        };
+        const updatedUsers = users.map(u => u.id === existingUser.id ? updatedUser : u);
+        localStorage.setItem('cinepet_users', JSON.stringify(updatedUsers));
+
+        onLogin({
+          id: existingUser.id,
+          username: existingUser.username,
+          email: authResult.user.email,
+          role: isAdmin ? 'admin' : existingUser.role,
+          credits: isAdmin ? 999999 : existingUser.credits,
+          cloudProvider: 'google',
+          cloudAccessToken: authResult.accessToken,
+          avatarUrl: authResult.user.picture
+        });
+      } else {
+        // Create new user
+        const newUser = {
+          id: 'google-' + authResult.user.id,
+          username: authResult.user.name || 'Studio Director',
+          email: authResult.user.email,
+          role: isAdmin ? 'admin' : 'user',
+          credits: isAdmin ? 999999 : 100,
+          cloudProvider: 'google',
+          cloudAccessToken: authResult.accessToken,
+          cloudTokenExpiry: authResult.expiresAt,
+          avatarUrl: authResult.user.picture
+        };
+
+        localStorage.setItem('cinepet_users', JSON.stringify([...users, newUser]));
+
+        onLogin({
+          id: newUser.id,
+          username: newUser.username,
+          email: newUser.email,
+          role: newUser.role as any,
+          credits: newUser.credits,
+          cloudProvider: 'google',
+          cloudAccessToken: authResult.accessToken,
+          avatarUrl: newUser.avatarUrl
+        });
+      }
+    } catch (err) {
+      console.error('Google Sign-In Error:', err);
+      setError(err instanceof Error ? err.message.toUpperCase() : 'GOOGLE SIGN-IN FAILED');
+    } finally {
       setIsGoogleLoading(false);
-    }, 1500);
+    }
   };
 
   return (
@@ -215,11 +280,25 @@ export const Auth: React.FC<AuthProps> = ({ onLogin }) => {
               <img src="https://upload.wikimedia.org/wikipedia/commons/5/53/Google_%22G%22_Logo.svg" className="w-5 h-5 group-hover:scale-110 transition-transform" alt="G" />
               {isGoogleLoading ? 'LINKING...' : 'GOOGLE'}
             </button>
-            <button 
-              onClick={() => setError('COMING SOON')}
+            <button
+              onClick={() => {
+                // Apple sign-in sets up for Share Sheet cloud storage (saves to iCloud Drive via Files app)
+                const newUser = {
+                  id: 'apple-' + Math.random().toString(36).substr(2, 9),
+                  username: 'Creative Director',
+                  email: '',
+                  role: 'user' as const,
+                  credits: 100,
+                  cloudProvider: 'icloud' as const
+                };
+                const usersJson = localStorage.getItem('cinepet_users');
+                const users: any[] = usersJson ? JSON.parse(usersJson) : [];
+                localStorage.setItem('cinepet_users', JSON.stringify([...users, newUser]));
+                onLogin(newUser);
+              }}
               className="flex-1 py-3 bg-black text-white border-4 border-black font-comic text-sm uppercase shadow-[4px_4px_0px_0px_#888] active:translate-x-1 active:translate-y-1 active:shadow-none transition-all flex items-center justify-center gap-2 hover:bg-zinc-800"
             >
-              APPLE ID
+               APPLE
             </button>
           </div>
 
