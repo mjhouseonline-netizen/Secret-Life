@@ -19,6 +19,7 @@ import { PerformanceAnalytics } from './components/PerformanceAnalytics';
 import { AppView, GeneratedContent, User, PosterTemplate, UserSettings } from './types';
 import { CloudService } from './services/cloud';
 import { storageService } from './services/storage';
+import { firebaseService } from './services/firebase';
 
 const CREDIT_COSTS: Record<string, number> = {
   poster: 5,
@@ -88,7 +89,11 @@ const App: React.FC = () => {
     localStorage.setItem('cinepet_current_user', JSON.stringify(u));
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    // Sign out from Firebase if configured
+    if (firebaseService.isConfigured()) {
+      await firebaseService.signOut();
+    }
     setUser(null);
     localStorage.removeItem('cinepet_current_user');
     setActiveView('poster');
@@ -102,33 +107,53 @@ const App: React.FC = () => {
     localStorage.removeItem('cinepet_poster_templates');
     localStorage.removeItem('cinepet_voice_clones');
     setHistory([]);
+    // Delete from Firebase if configured
+    if (user && firebaseService.isConfigured()) {
+      await firebaseService.deleteAccount(user.id);
+    }
     handleLogout();
   };
 
-  const handleUpdateSettings = (settings: UserSettings) => {
+  const handleUpdateSettings = async (settings: UserSettings) => {
     if (!user) return;
     const updatedUser = { ...user, settings };
     updateUserState(updatedUser);
+    // Sync to Firebase if configured
+    if (firebaseService.isConfigured()) {
+      await firebaseService.updateSettings(user.id, settings);
+    }
   };
 
   const deductCredits = (amount: number): boolean => {
     if (!user) return false;
     if (user.role === 'admin') return true;
-    
+
     if (user.credits < amount) {
       alert(`BUDGET CONSTRAINT: This production requires ${amount} credits. Please top up in the studio store.`);
       return false;
     }
 
-    const updatedUser = { ...user, credits: user.credits - amount };
+    const newCredits = user.credits - amount;
+    const updatedUser = { ...user, credits: newCredits };
     updateUserState(updatedUser);
+
+    // Sync credits to Firebase
+    if (firebaseService.isConfigured()) {
+      firebaseService.updateCredits(user.id, newCredits);
+    }
     return true;
   };
 
   const handleAddCredits = (credits: number) => {
     if (!user) return;
-    const updatedUser = { ...user, credits: user.credits + credits };
+    const newCredits = user.credits + credits;
+    const updatedUser = { ...user, credits: newCredits };
     updateUserState(updatedUser);
+
+    // Sync credits to Firebase
+    if (firebaseService.isConfigured()) {
+      firebaseService.updateCredits(user.id, newCredits);
+    }
     alert(`BUDGET SECURED: ${credits} production credits added.`);
   };
 
