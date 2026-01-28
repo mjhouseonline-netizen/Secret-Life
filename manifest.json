@@ -1,18 +1,65 @@
-
 {
-  "name": "CinePet Studio",
-  "short_name": "CinePet",
-  "description": "AI Cinematic Poster and Video Studio",
+  "name": "The Secret Life Of Your Pet - AI Studio",
+  "short_name": "Secret Life",
+  "description": "AI-powered creative studio for cinematic pet posters, comics, and videos",
   "start_url": "/",
   "display": "standalone",
+  "orientation": "portrait-primary",
   "background_color": "#09090b",
   "theme_color": "#4f46e5",
+  "categories": ["entertainment", "creativity", "photo"],
   "icons": [
+    {
+      "src": "https://cdn-icons-png.flaticon.com/128/3067/3067260.png",
+      "sizes": "128x128",
+      "type": "image/png"
+    },
+    {
+      "src": "https://cdn-icons-png.flaticon.com/256/3067/3067260.png",
+      "sizes": "256x256",
+      "type": "image/png"
+    },
     {
       "src": "https://cdn-icons-png.flaticon.com/512/3067/3067260.png",
       "sizes": "512x512",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
+    },
+    {
+      "src": "https://cdn-icons-png.flaticon.com/512/3067/3067260.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "screenshots": [],
+  "share_target": {
+    "action": "/",
+    "method": "POST",
+    "enctype": "multipart/form-data",
+    "params": {
+      "files": [
+        {
+          "name": "media",
+          "accept": ["image/*", "video/*"]
+        }
+      ]
+    }
+  },
+  "shortcuts": [
+    {
+      "name": "Create Poster",
+      "short_name": "Poster",
+      "description": "Create a new cinematic poster",
+      "url": "/?view=poster",
+      "icons": [{ "src": "https://cdn-icons-png.flaticon.com/128/3067/3067260.png", "sizes": "128x128" }]
+    },
+    {
+      "name": "View Library",
+      "short_name": "Library",
+      "description": "View your creations",
+      "url": "/?view=history",
+      "icons": [{ "src": "https://cdn-icons-png.flaticon.com/128/3067/3067260.png", "sizes": "128x128" }]
     }
   ]
 }
