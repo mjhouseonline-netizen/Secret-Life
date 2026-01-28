@@ -143,7 +143,8 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeView, setActiveV
       </main>
 
       {showPurchase && (
-        <CreditPurchase 
+        <CreditPurchase
+          userId={user.id}
           onPurchaseComplete={(credits) => {
             onAddCredits(credits);
             setShowPurchase(false);

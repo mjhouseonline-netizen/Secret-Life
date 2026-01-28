@@ -1,7 +1,8 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { User } from '../types';
 import { CloudService } from '../services/cloud';
+import { firebaseService } from '../services/firebase';
 
 interface AuthProps {
   onLogin: (user: User) => void;
@@ -59,8 +60,16 @@ export const Auth: React.FC<AuthProps> = ({ onLogin }) => {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
+  const [isAppleLoading, setIsAppleLoading] = useState(false);
+  const [isFirebaseReady, setIsFirebaseReady] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  useEffect(() => {
+    // Initialize Firebase
+    const ready = firebaseService.init();
+    setIsFirebaseReady(ready);
+  }, []);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
 
@@ -69,22 +78,53 @@ export const Auth: React.FC<AuthProps> = ({ onLogin }) => {
       return;
     }
 
+    // Use Firebase if configured and username looks like email
+    if (isFirebaseReady && username.includes('@')) {
+      try {
+        let user: User;
+        if (isLogin) {
+          user = await firebaseService.signInWithEmail(username, password);
+        } else {
+          const displayName = username.split('@')[0];
+          user = await firebaseService.signUpWithEmail(username, password, displayName);
+        }
+        onLogin(user);
+        return;
+      } catch (err: any) {
+        // Map Firebase errors to friendly messages
+        const errorCode = err.code || '';
+        if (errorCode.includes('user-not-found') || errorCode.includes('wrong-password')) {
+          setError('ACCESS DENIED!');
+        } else if (errorCode.includes('email-already-in-use')) {
+          setError('AGENT EXISTS!');
+        } else if (errorCode.includes('weak-password')) {
+          setError('PASSWORD TOO WEAK!');
+        } else if (errorCode.includes('invalid-email')) {
+          setError('INVALID EMAIL!');
+        } else {
+          setError(err.message?.toUpperCase() || 'AUTH FAILED!');
+        }
+        return;
+      }
+    }
+
+    // Fallback to localStorage for non-email usernames or when Firebase not configured
     const usersJson = localStorage.getItem('cinepet_users');
     const users: any[] = usersJson ? JSON.parse(usersJson) : [];
 
     if (isLogin) {
-      const user = users.find(u => 
-        (u.username?.toLowerCase() === username.toLowerCase() || u.email?.toLowerCase() === username.toLowerCase()) && 
+      const user = users.find(u =>
+        (u.username?.toLowerCase() === username.toLowerCase() || u.email?.toLowerCase() === username.toLowerCase()) &&
         u.password === password
       );
 
       if (user) {
         const role = user.email?.toLowerCase() === ADMIN_EMAIL ? 'admin' : user.role || 'user';
-        onLogin({ 
-          id: user.id, 
-          username: user.username, 
+        onLogin({
+          id: user.id,
+          username: user.username,
           email: user.email,
-          role: role as any, 
+          role: role as any,
           credits: role === 'admin' ? 999999 : user.credits,
           cloudProvider: user.cloudProvider || 'none'
         });
@@ -92,8 +132,8 @@ export const Auth: React.FC<AuthProps> = ({ onLogin }) => {
         setError('ACCESS DENIED!');
       }
     } else {
-      const existingUser = users.find(u => 
-        u.username?.toLowerCase() === username.toLowerCase() || 
+      const existingUser = users.find(u =>
+        u.username?.toLowerCase() === username.toLowerCase() ||
         (u.email && u.email.toLowerCase() === username.toLowerCase())
       );
 
@@ -112,13 +152,13 @@ export const Auth: React.FC<AuthProps> = ({ onLogin }) => {
         credits: isNewAdmin ? 999999 : 50,
         cloudProvider: 'none'
       };
-      
+
       localStorage.setItem('cinepet_users', JSON.stringify([...users, newUser]));
-      onLogin({ 
-        id: newUser.id, 
-        username: newUser.username, 
+      onLogin({
+        id: newUser.id,
+        username: newUser.username,
         email: newUser.email,
-        role: newUser.role as any, 
+        role: newUser.role as any,
         credits: newUser.credits,
         cloudProvider: 'none'
       });
@@ -130,25 +170,28 @@ export const Auth: React.FC<AuthProps> = ({ onLogin }) => {
     setError('');
 
     try {
-      // Check if Google OAuth is configured
+      // Use Firebase Auth if configured
+      if (isFirebaseReady) {
+        const user = await firebaseService.signInWithGoogle();
+        onLogin(user);
+        return;
+      }
+
+      // Fallback to custom OAuth flow
       if (!CloudService.isGoogleConfigured()) {
         setError('GOOGLE NOT CONFIGURED');
         setIsGoogleLoading(false);
         return;
       }
 
-      // Initiate real OAuth flow
       const authResult = await CloudService.initiateGoogleOAuth();
 
-      // Check if this user already exists
       const usersJson = localStorage.getItem('cinepet_users');
       const users: any[] = usersJson ? JSON.parse(usersJson) : [];
       const existingUser = users.find(u => u.email?.toLowerCase() === authResult.user.email.toLowerCase());
-
       const isAdmin = authResult.user.email.toLowerCase() === ADMIN_EMAIL;
 
       if (existingUser) {
-        // Update existing user with new token
         const updatedUser = {
           ...existingUser,
           cloudProvider: 'google',
@@ -170,7 +213,6 @@ export const Auth: React.FC<AuthProps> = ({ onLogin }) => {
           avatarUrl: authResult.user.picture
         });
       } else {
-        // Create new user
         const newUser = {
           id: 'google-' + authResult.user.id,
           username: authResult.user.name || 'Studio Director',
@@ -201,6 +243,39 @@ export const Auth: React.FC<AuthProps> = ({ onLogin }) => {
       setError(err instanceof Error ? err.message.toUpperCase() : 'GOOGLE SIGN-IN FAILED');
     } finally {
       setIsGoogleLoading(false);
+    }
+  };
+
+  const handleAppleSignIn = async () => {
+    setIsAppleLoading(true);
+    setError('');
+
+    try {
+      // Use Firebase Auth for Apple Sign-In
+      if (isFirebaseReady) {
+        const user = await firebaseService.signInWithApple();
+        onLogin(user);
+        return;
+      }
+
+      // Fallback to local user with iCloud share sheet
+      const newUser = {
+        id: 'apple-' + Math.random().toString(36).substr(2, 9),
+        username: 'Creative Director',
+        email: '',
+        role: 'user' as const,
+        credits: 100,
+        cloudProvider: 'icloud' as const
+      };
+      const usersJson = localStorage.getItem('cinepet_users');
+      const users: any[] = usersJson ? JSON.parse(usersJson) : [];
+      localStorage.setItem('cinepet_users', JSON.stringify([...users, newUser]));
+      onLogin(newUser);
+    } catch (err) {
+      console.error('Apple Sign-In Error:', err);
+      setError(err instanceof Error ? err.message.toUpperCase() : 'APPLE SIGN-IN FAILED');
+    } finally {
+      setIsAppleLoading(false);
     }
   };
 
@@ -281,24 +356,14 @@ export const Auth: React.FC<AuthProps> = ({ onLogin }) => {
               {isGoogleLoading ? 'LINKING...' : 'GOOGLE'}
             </button>
             <button
-              onClick={() => {
-                // Apple sign-in sets up for Share Sheet cloud storage (saves to iCloud Drive via Files app)
-                const newUser = {
-                  id: 'apple-' + Math.random().toString(36).substr(2, 9),
-                  username: 'Creative Director',
-                  email: '',
-                  role: 'user' as const,
-                  credits: 100,
-                  cloudProvider: 'icloud' as const
-                };
-                const usersJson = localStorage.getItem('cinepet_users');
-                const users: any[] = usersJson ? JSON.parse(usersJson) : [];
-                localStorage.setItem('cinepet_users', JSON.stringify([...users, newUser]));
-                onLogin(newUser);
-              }}
-              className="flex-1 py-3 bg-black text-white border-4 border-black font-comic text-sm uppercase shadow-[4px_4px_0px_0px_#888] active:translate-x-1 active:translate-y-1 active:shadow-none transition-all flex items-center justify-center gap-2 hover:bg-zinc-800"
+              onClick={handleAppleSignIn}
+              disabled={isAppleLoading}
+              className="flex-1 py-3 bg-black text-white border-4 border-black font-comic text-sm uppercase shadow-[4px_4px_0px_0px_#888] active:translate-x-1 active:translate-y-1 active:shadow-none transition-all flex items-center justify-center gap-2 hover:bg-zinc-800 disabled:opacity-50"
             >
-               APPLE
+               <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
+                 <path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.81-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/>
+               </svg>
+               {isAppleLoading ? 'LINKING...' : 'APPLE'}
             </button>
           </div>
 
