@@ -8,8 +8,7 @@ interface AuthProps {
 
 const ADMIN_EMAIL = 'bubblesfox@gmail.com';
 // REPLACE THIS with your actual Client ID from Google Cloud Console (APIs & Services > Credentials)
-const GOOGLE_CLIENT_ID = '762235941913-7o7pvkf4eujq3p761a3f6vbe1c5k3c4p.apps.googleusercontent.com';
-
+const GOOGLE_CLIENT_ID = 1042356611430-qa2i8o4fgavdqu9ivvtq9i1qdlpomp5p.apps.googleusercontent.com
 const ACTION_PANELS = [
   { 
     id: 1,
