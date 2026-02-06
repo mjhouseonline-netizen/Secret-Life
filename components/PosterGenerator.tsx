@@ -9,17 +9,88 @@ interface PosterGeneratorProps {
   onClearDraft?: () => void;
 }
 
-const OUTFIT_OPTIONS = [
-  'Cybernetic Power Suit',
-  'Medieval Knight Armor',
-  'Golden Cape & Crest',
-  'Spaceship Pilot Gear',
-  'Tattered Ronin Robes',
-  'High-Tech Tactical Vest',
-  'Victorian Noble Attire',
-  'Obsidian Dark-Lord Armor',
-  'Neon Samurai Plates'
-];
+const OUTFIT_CATEGORIES = {
+  'SCI-FI & TECH': [
+    'Cybernetic Power Suit',
+    'Spaceship Pilot Gear',
+    'High-Tech Tactical Vest',
+    'Neon Samurai Plates',
+    'Clockwork Exoskeleton',
+    'Supernova Hazard Suit',
+    'Scrap-Yard Mech Armor',
+    'Quantum Phase Jumpsuit',
+    'Ion-Core Heavy Plating',
+    'Saturn-Ring Orbit Gears',
+    'Plasma Shield Rig',
+    'Nanotech Stealth Skin'
+  ],
+  'FANTASY & MAGIC': [
+    'Medieval Knight Armor',
+    'Golden Cape & Crest',
+    'Tattered Ronin Robes',
+    'Obsidian Dark-Lord Armor',
+    'Druidic Vine Wraps',
+    'Celestial Guardian Robes',
+    'Frost-Giant Hide Armor',
+    'Elderwood Shaman Robes',
+    'Dragon-Scale Mail',
+    'Ethereal Ghost-Armor',
+    'Phoenix Feather Cloak',
+    'Runelord Plate'
+  ],
+  'MYTHOLOGICAL & LEGENDARY': [
+    'Mjolnir-Powered Gauntlets',
+    'Aegis Reflective Shield-Vest',
+    'Monkey King Silk Robes',
+    'Thunder God Bracers',
+    'Valkyrie Winged Armor',
+    'Anubis Death-Guard Wrap',
+    'Poseidon Trident Harness',
+    'Oni Demon Mask & Armor'
+  ],
+  'ELEMENTAL & NATURE': [
+    'Bioluminescent Scuba Rig',
+    'Living Leaf Plate',
+    'Volcanic Magma Shards',
+    'Ice-Crystal Carapace',
+    'Desert Nomad Wraps',
+    'Storm-Cloud Mantle',
+    'Solar-Flare Regalia',
+    'Abyssal Deep-Sea Shell'
+  ],
+  'HISTORICAL & NOBLE': [
+    'Victorian Noble Attire',
+    'Royal Guard Uniform',
+    'Viking Fur & Bone',
+    'Gladiator Sand-Plate',
+    'Samurai O-Yoroi',
+    'Aztec Jaguar Warrior Hide',
+    'Napoleonic Guard Uniform',
+    'Spartan Bronze Cuirass',
+    'Mongolian Steppe Armor'
+  ],
+  'MODERN & TACTICAL': [
+    'K-9 Special Ops Harness',
+    'Urban Ninja Sweats',
+    'High-Vis Construction Mech',
+    'Street-Brawler Hoodie & Wraps',
+    'Parkour Speed-Suit',
+    'Underground Agent Trenchcoat',
+    'Riot Control Exo-Shell'
+  ],
+  'WHIMSICAL & SURREAL': [
+    'Bubble-Gum Power Armor',
+    'Cardboard Box Mech',
+    'Stealth Shadow Cloak',
+    'Neon Holographic Suit',
+    'Glow-in-the-Dark Skeleton Onesie',
+    'Candy-Cane Staff & Cape',
+    'Invisibility Pajamas',
+    'Marshmallow Defender Suit'
+  ]
+};
+
+const OUTFIT_OPTIONS = Object.values(OUTFIT_CATEGORIES).flat();
 
 export const PosterGenerator: React.FC<PosterGeneratorProps> = ({ onGenerated, initialData, onClearDraft }) => {
   const [step, setStep] = useState(1);
@@ -47,6 +118,7 @@ export const PosterGenerator: React.FC<PosterGeneratorProps> = ({ onGenerated, i
   const [loading, setLoading] = useState(false);
   const [generatingScenario, setGeneratingScenario] = useState(false);
   const [generatingName, setGeneratingName] = useState(false);
+  const [generatingOutfit, setGeneratingOutfit] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   
@@ -65,6 +137,28 @@ export const PosterGenerator: React.FC<PosterGeneratorProps> = ({ onGenerated, i
       updateMember({ alias });
     } finally {
       setGeneratingName(false);
+    }
+  };
+
+  const handleGenerateOutfit = async () => {
+    if (!activeMember.species) return;
+    setGeneratingOutfit(true);
+    try {
+      const outfit = await GeminiService.generateOutfitDescription(activeMember, alignment, selectedStyle);
+      updateMember({ outfit });
+    } finally {
+      setGeneratingOutfit(false);
+    }
+  };
+
+  const handleGenerateScenario = async () => {
+    if (cast.length === 0 || !cast[0].name) return;
+    setGeneratingScenario(true);
+    try {
+      const generatedScenario = await GeminiService.generatePosterScenario(cast, alignment);
+      setScenario(generatedScenario);
+    } finally {
+      setGeneratingScenario(false);
     }
   };
 
@@ -230,25 +324,46 @@ export const PosterGenerator: React.FC<PosterGeneratorProps> = ({ onGenerated, i
                             value={activeMember.alias}
                             onChange={(e) => updateMember({ alias: e.target.value })}
                             className="w-full bg-zinc-800 border-3 border-black p-4 text-white font-bold focus:border-cyan-400 outline-none pr-12"
+                            placeholder="e.g. THE GOLDEN BARK"
                           />
                           <button 
                             onClick={handleGenerateName}
                             disabled={generatingName}
                             className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-black hover:scale-110 transition-transform uppercase text-cyan-400"
                           >
-                            {generatingName ? 'WAIT' : 'GENERATE'}
+                            {generatingName ? 'WAIT' : 'MAGIC'}
                           </button>
                        </div>
                     </div>
 
                     <div className="space-y-2">
                        <label className="text-[10px] font-black uppercase tracking-widest text-zinc-500">BATTLE GEAR</label>
+                       <div className="relative">
+                         <input 
+                            type="text" 
+                            value={activeMember.outfit}
+                            onChange={(e) => updateMember({ outfit: e.target.value })}
+                            className="w-full bg-zinc-800 border-3 border-black p-4 text-white font-bold focus:border-cyan-400 outline-none pr-12"
+                            placeholder="Describe or select gear..."
+                          />
+                          <button 
+                            onClick={handleGenerateOutfit}
+                            disabled={generatingOutfit}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-black hover:scale-110 transition-transform uppercase text-magenta-400"
+                          >
+                            {generatingOutfit ? 'WAIT' : 'DESIGN'}
+                          </button>
+                       </div>
                        <select 
-                        value={activeMember.outfit}
                         onChange={(e) => updateMember({ outfit: e.target.value })}
-                        className="w-full bg-zinc-800 border-3 border-black p-4 text-white font-bold focus:border-cyan-400 outline-none appearance-none"
+                        className="w-full mt-2 bg-zinc-950 border-2 border-black p-2 text-[10px] text-zinc-500 font-bold uppercase outline-none"
                        >
-                         {OUTFIT_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}
+                         <option value="">-- Quick Select Presets --</option>
+                         {Object.entries(OUTFIT_CATEGORIES).map(([category, options]) => (
+                           <optgroup key={category} label={category}>
+                             {options.map(o => <option key={o} value={o}>{o}</option>)}
+                           </optgroup>
+                         ))}
                        </select>
                     </div>
 
@@ -258,7 +373,7 @@ export const PosterGenerator: React.FC<PosterGeneratorProps> = ({ onGenerated, i
                           value={activeMember.traits}
                           onChange={(e) => updateMember({ traits: e.target.value })}
                           className="w-full h-24 bg-zinc-800 border-3 border-black p-4 text-white font-bold focus:border-cyan-400 outline-none resize-none"
-                          placeholder="e.g. Always eats the last pizza slice..."
+                          placeholder="e.g. Always eats the last pizza slice, fears vacuum cleaners..."
                        />
                     </div>
                   </div>
@@ -291,11 +406,20 @@ export const PosterGenerator: React.FC<PosterGeneratorProps> = ({ onGenerated, i
                     </div>
 
                     <div className="space-y-2">
-                       <label className="text-[10px] font-black uppercase tracking-widest text-zinc-500">SCENE DESCRIPTION</label>
+                       <div className="flex justify-between items-center">
+                         <label className="text-[10px] font-black uppercase tracking-widest text-zinc-500">SCENE DESCRIPTION</label>
+                         <button 
+                           onClick={handleGenerateScenario}
+                           disabled={generatingScenario}
+                           className="text-[10px] font-black uppercase text-yellow-400 hover:underline transition-all"
+                         >
+                           {generatingScenario ? 'SCRIPTING...' : 'AI SCRIPTWRITER'}
+                         </button>
+                       </div>
                        <textarea
                         value={scenario}
                         onChange={(e) => setScenario(e.target.value)}
-                        placeholder="Describe the action shot..."
+                        placeholder="Describe the action shot... e.g. An epic showdown on top of a futuristic skyscraper during a neon rainstorm."
                         className="w-full h-32 bg-zinc-800 border-3 border-black p-4 text-white font-bold focus:border-cyan-400 outline-none resize-none"
                        />
                     </div>

@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { User, UserSettings } from '../types';
 
 interface SettingsStudioProps {
@@ -9,7 +9,12 @@ interface SettingsStudioProps {
   onDeleteAccount: () => void;
 }
 
+const GOOGLE_CLIENT_ID = '762235941913-7o7pvkf4eujq3p761a3f6vbe1c5k3c4p.apps.googleusercontent.com';
+
 export const SettingsStudio: React.FC<SettingsStudioProps> = ({ user, onUpdateSettings, onLogout, onDeleteAccount }) => {
+  const [isAuthorizing, setIsAuthorizing] = useState(false);
+  const [authError, setAuthError] = useState<string | null>(null);
+
   const currentSettings: UserSettings = user.settings || {
     safeMode: true,
     hdByDefault: true,
@@ -21,6 +26,41 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ user, onUpdateSe
       ...currentSettings,
       [key]: !currentSettings[key]
     });
+  };
+
+  const handleAuthorizeDrive = () => {
+    setIsAuthorizing(true);
+    setAuthError(null);
+    const google = (window as any).google;
+    
+    if (!google?.accounts?.oauth2) {
+      setAuthError("Google Identity services not ready.");
+      setIsAuthorizing(false);
+      return;
+    }
+
+    // This triggers the OAuth2 Token flow for Drive scopes
+    const client = google.accounts.oauth2.initTokenClient({
+      client_id: GOOGLE_CLIENT_ID,
+      scope: 'https://www.googleapis.com/auth/drive.file',
+      callback: (response: any) => {
+        if (response.error) {
+          setAuthError(response.error_description || "Authorization failed.");
+        } else {
+          // Update the user with the new access token
+          onUpdateSettings({
+            ...currentSettings,
+            autoCloudSync: true
+          });
+          // Note: In App.tsx we should save the cloudAccessToken
+          // For now we'll trigger a dummy update to simulate state change
+          window.dispatchEvent(new CustomEvent('cloud-auth-success', { detail: response.access_token }));
+        }
+        setIsAuthorizing(false);
+      },
+    });
+
+    client.requestAccessToken();
   };
 
   return (
@@ -62,16 +102,38 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ user, onUpdateSe
              </div>
              <div className="p-8 flex items-center justify-between">
                 <div>
-                   <h4 className="text-sm font-bold text-white mb-1">Auto Cloud Sync</h4>
+                   <h4 className="text-sm font-bold text-white mb-1">Cloud Archiving</h4>
                    <p className="text-xs text-zinc-500">Automatically back up every production to Google Drive/iCloud.</p>
                 </div>
-                <button 
-                  onClick={() => toggleSetting('autoCloudSync')}
-                  className={`w-12 h-6 rounded-full transition-all relative ${currentSettings.autoCloudSync ? 'bg-indigo-600' : 'bg-zinc-800'}`}
-                >
-                  <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${currentSettings.autoCloudSync ? 'left-7' : 'left-1'}`}></div>
-                </button>
+                <div className="flex flex-col items-end gap-2">
+                  <button 
+                    disabled={user.cloudProvider === 'google' && !user.cloudAccessToken && !currentSettings.autoCloudSync}
+                    onClick={() => toggleSetting('autoCloudSync')}
+                    className={`w-12 h-6 rounded-full transition-all relative ${currentSettings.autoCloudSync ? 'bg-indigo-600' : 'bg-zinc-800'}`}
+                  >
+                    <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${currentSettings.autoCloudSync ? 'left-7' : 'left-1'}`}></div>
+                  </button>
+                </div>
              </div>
+             
+             {user.cloudProvider === 'google' && (
+               <div className="p-8 bg-indigo-900/10">
+                  <div className="flex items-center justify-between mb-4">
+                     <div>
+                        <h4 className="text-sm font-bold text-indigo-400 mb-1">Authorize Google Drive</h4>
+                        <p className="text-[10px] text-zinc-500 uppercase font-bold tracking-widest">Required for Auto-Sync to function.</p>
+                     </div>
+                     <button 
+                        onClick={handleAuthorizeDrive}
+                        disabled={isAuthorizing}
+                        className={`px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-[10px] font-black uppercase rounded-xl transition-all shadow-lg ${isAuthorizing ? 'animate-pulse' : ''}`}
+                     >
+                        {isAuthorizing ? 'AUTHORIZING...' : user.cloudAccessToken ? 'RE-AUTHORIZE' : 'GRANT PERMISSION'}
+                     </button>
+                  </div>
+                  {authError && <p className="text-red-400 text-[10px] font-bold uppercase">{authError}</p>}
+               </div>
+             )}
           </div>
         </div>
 

@@ -47,7 +47,17 @@ const App: React.FC = () => {
     if (savedHistory) {
       setHistory(JSON.parse(savedHistory));
     }
-  }, []);
+
+    // Listen for cloud authorization success
+    const handleCloudAuth = (e: any) => {
+      if (user) {
+        const updatedUser = { ...user, cloudAccessToken: e.detail };
+        updateUserState(updatedUser);
+      }
+    };
+    window.addEventListener('cloud-auth-success', handleCloudAuth);
+    return () => window.removeEventListener('cloud-auth-success', handleCloudAuth);
+  }, [user]);
 
   const handleLogin = (u: User) => {
     setUser(u);
@@ -103,6 +113,12 @@ const App: React.FC = () => {
   const syncToCloud = async (content: GeneratedContent) => {
     if (!user || user.cloudProvider === 'none') return;
     
+    // We need a valid access token for Google Drive sync
+    if (user.cloudProvider === 'google' && !user.cloudAccessToken) {
+      console.warn('Sync pending: Google Drive authorization required.');
+      return;
+    }
+
     setSyncingCount(prev => prev + 1);
     try {
       let cloudUrl = '';

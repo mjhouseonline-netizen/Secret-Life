@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { User } from '../types';
 
 interface AuthProps {
@@ -7,8 +7,9 @@ interface AuthProps {
 }
 
 const ADMIN_EMAIL = 'bubblesfox@gmail.com';
+// REPLACE THIS with your actual Client ID from Google Cloud Console (APIs & Services > Credentials)
+const GOOGLE_CLIENT_ID = '762235941913-7o7pvkf4eujq3p761a3f6vbe1c5k3c4p.apps.googleusercontent.com';
 
-// Action-packed pet images with comic-book filters
 const ACTION_PANELS = [
   { 
     id: 1,
@@ -58,6 +59,84 @@ export const Auth: React.FC<AuthProps> = ({ onLogin }) => {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
+  
+  const googleBtnRef = useRef<HTMLDivElement>(null);
+
+  // Helper to parse Google JWT (ID Token)
+  const parseJwt = (token: string) => {
+    try {
+      const base64Url = token.split('.')[1];
+      const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+      const jsonPayload = decodeURIComponent(atob(base64).split('').map(function(c) {
+        return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+      }).join(''));
+      return JSON.parse(jsonPayload);
+    } catch (e) {
+      return null;
+    }
+  };
+
+  useEffect(() => {
+    const initializeGsi = () => {
+      const google = (window as any).google;
+      if (google?.accounts?.id) {
+        google.accounts.id.initialize({
+          client_id: GOOGLE_CLIENT_ID,
+          callback: handleGoogleResponse,
+          auto_select: false, // Forces the user to pick an account if multiple are available
+          cancel_on_tap_outside: true,
+          use_fedcm_for_prompt: true,
+        });
+
+        // The rendered button is the ONLY reliable way to ensure the account picker triggers 
+        // without being blocked by pop-up blockers or FedCM permission issues.
+        google.accounts.id.renderButton(
+          googleBtnRef.current,
+          { 
+            theme: 'outline', 
+            size: 'large', 
+            text: 'continue_with',
+            shape: 'pill',
+            width: 320,
+            logo_alignment: 'left'
+          }
+        );
+      }
+    };
+
+    const checkGsi = setInterval(() => {
+      if ((window as any).google?.accounts?.id) {
+        initializeGsi();
+        clearInterval(checkGsi);
+      }
+    }, 100);
+
+    return () => clearInterval(checkGsi);
+  }, []);
+
+  const handleGoogleResponse = (response: any) => {
+    setIsGoogleLoading(true);
+    const payload = parseJwt(response.credential);
+    
+    if (payload) {
+      const isNewAdmin = payload.email?.toLowerCase() === ADMIN_EMAIL;
+      onLogin({
+        id: payload.sub || 'google-' + Math.random().toString(36).substr(2, 9),
+        username: payload.name || 'Studio Director',
+        email: payload.email,
+        avatarUrl: payload.picture,
+        role: isNewAdmin ? 'admin' : 'user',
+        credits: isNewAdmin ? 999999 : 100,
+        cloudProvider: 'google',
+        // Note: response.credential is an ID Token, not an Access Token for Drive.
+        // Access tokens for Drive must be obtained via google.accounts.oauth2.initTokenClient in Settings.
+        cloudAccessToken: undefined 
+      });
+    } else {
+      setError('AUTHENTICATION FAILED!');
+    }
+    setIsGoogleLoading(false);
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -124,24 +203,8 @@ export const Auth: React.FC<AuthProps> = ({ onLogin }) => {
     }
   };
 
-  const handleGoogleSignIn = () => {
-    setIsGoogleLoading(true);
-    setTimeout(() => {
-      onLogin({
-        id: 'google-' + Math.random().toString(36).substr(2, 9),
-        username: 'Studio Director',
-        email: 'director@gmail.com',
-        role: 'user',
-        credits: 100,
-        cloudProvider: 'google'
-      });
-      setIsGoogleLoading(false);
-    }, 1500);
-  };
-
   return (
     <div className="min-h-screen bg-blue-600 flex items-center justify-center p-4 md:p-12 relative overflow-hidden">
-      {/* Pop Art Background Pattern */}
       <div className="absolute inset-0 z-0 pointer-events-none opacity-20"
            style={{
              backgroundImage: 'radial-gradient(circle, #ffffff 4px, transparent 4.5px)',
@@ -149,14 +212,12 @@ export const Auth: React.FC<AuthProps> = ({ onLogin }) => {
            }}>
       </div>
       
-      {/* Dynamic Sunburst */}
       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[200vw] h-[200vw] animate-[spin_60s_linear_infinite] opacity-10 pointer-events-none">
          <div className="w-full h-full" style={{
            background: 'conic-gradient(from 0deg, #fff 0deg 10deg, transparent 10deg 20deg, #fff 20deg 30deg, transparent 30deg 40deg, #fff 40deg 50deg, transparent 50deg 60deg, #fff 60deg 70deg, transparent 70deg 80deg, #fff 80deg 90deg, transparent 90deg 100deg, #fff 100deg 110deg, transparent 110deg 120deg)'
          }}></div>
       </div>
 
-      {/* Comic Panels Floating */}
       {ACTION_PANELS.map((panel, idx) => (
         <div 
           key={panel.id}
@@ -166,7 +227,6 @@ export const Auth: React.FC<AuthProps> = ({ onLogin }) => {
           <div className="relative aspect-square overflow-hidden border-b-4 border-black group">
             <img src={panel.img} className="w-full h-full object-cover filter contrast-125 saturate-150 group-hover:scale-110 transition-transform duration-700" />
             <div className="absolute top-0 left-0 bg-black/20 inset-0 pointer-events-none mix-blend-hard-light"></div>
-            {/* Comic Speech Bubble */}
             <div className="absolute -top-4 -right-4 bg-white border-4 border-black px-4 py-2 rounded-[50%] rounded-bl-none shadow-[4px_4px_0px_0px_#000] z-20">
               <span className="font-comic text-xl text-black uppercase">{panel.shout}</span>
             </div>
@@ -177,10 +237,7 @@ export const Auth: React.FC<AuthProps> = ({ onLogin }) => {
         </div>
       ))}
 
-      {/* Main Login Card - The "Cover Issue" */}
       <div className="max-w-md w-full relative z-20 mx-auto">
-        
-        {/* Logo Section */}
         <div className="text-center mb-8 relative">
            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-white/20 rounded-full blur-3xl -z-10"></div>
            <h1 className="text-[60px] md:text-[85px] font-comic text-white stroke-black-bold drop-shadow-[8px_8px_0px_#000] leading-none tracking-tighter transform -rotate-2 hover:rotate-2 transition-transform cursor-default select-none">
@@ -191,9 +248,7 @@ export const Auth: React.FC<AuthProps> = ({ onLogin }) => {
            </div>
         </div>
 
-        {/* Login Box */}
         <div className="bg-white border-[6px] border-black p-8 shadow-[20px_20px_0px_0px_rgba(0,0,0,0.8)] relative transform rotate-1">
-          {/* Decorative Corner Tape */}
           <div className="absolute -top-3 -left-3 w-12 h-12 bg-lime-400 border-4 border-black z-30"></div>
           <div className="absolute -bottom-3 -right-3 w-12 h-12 bg-fuchsia-500 border-4 border-black z-30"></div>
 
@@ -206,21 +261,18 @@ export const Auth: React.FC<AuthProps> = ({ onLogin }) => {
             </p>
           </div>
 
-          <div className="flex gap-3 mb-6">
-            <button 
-              onClick={handleGoogleSignIn}
-              disabled={isGoogleLoading}
-              className="flex-1 py-3 bg-white hover:bg-zinc-50 text-black border-4 border-black font-comic text-sm uppercase shadow-[4px_4px_0px_0px_#000] active:translate-x-1 active:translate-y-1 active:shadow-none transition-all flex items-center justify-center gap-2 disabled:opacity-50 group"
-            >
-              <img src="https://upload.wikimedia.org/wikipedia/commons/5/53/Google_%22G%22_Logo.svg" className="w-5 h-5 group-hover:scale-110 transition-transform" alt="G" />
-              {isGoogleLoading ? 'LINKING...' : 'GOOGLE'}
-            </button>
-            <button 
-              onClick={() => setError('COMING SOON')}
-              className="flex-1 py-3 bg-black text-white border-4 border-black font-comic text-sm uppercase shadow-[4px_4px_0px_0px_#888] active:translate-x-1 active:translate-y-1 active:shadow-none transition-all flex items-center justify-center gap-2 hover:bg-zinc-800"
-            >
-              APPLE ID
-            </button>
+          <div className="flex flex-col items-center gap-4 mb-8">
+            {/* THIS IS THE GOOGLE BUTTON - MUST BE RENDERED VIA GSI FOR FULL PROMPT CONTROL */}
+            <div ref={googleBtnRef} className="min-h-[50px] flex items-center justify-center">
+               {!isGoogleLoading && <div className="animate-pulse bg-zinc-100 rounded-full w-[300px] h-[50px]"></div>}
+            </div>
+            
+            {isGoogleLoading && (
+               <div className="flex items-center gap-2 text-zinc-400 animate-pulse">
+                  <div className="w-4 h-4 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
+                  <span className="text-[10px] font-black uppercase">AUTHENTICATING AGENT...</span>
+               </div>
+            )}
           </div>
 
           <div className="relative flex items-center gap-3 mb-6">
