@@ -22,7 +22,6 @@ export interface User {
   avatarUrl?: string;
   cloudProvider: CloudProvider;
   cloudAccessToken?: string;
-  cloudTokenExpiry?: number;
   settings?: UserSettings;
 }
 

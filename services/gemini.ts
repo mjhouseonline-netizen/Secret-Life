@@ -21,17 +21,40 @@ export class GeminiService {
 
   private static handleError(error: any) {
     console.error("Gemini API Error Details:", error);
-    const message = error.message || "";
-    if (message.includes("403") || message.includes("PERMISSION_DENIED")) return "Access denied. Enable billing at ai.google.dev/gemini-api/docs/billing.";
-    if (message.includes("401") || message.includes("UNAUTHENTICATED")) return "Authentication failed. Re-select your API key.";
-    if (message.includes("429") || message.includes("RESOURCE_EXHAUSTED")) return "Rate limit reached. Please wait a moment.";
-    if (message.includes("SAFETY")) return "Generation blocked by safety filters. Adjust your prompt.";
-    if (message.includes("404") || message.includes("Requested entity was not found")) {
-      // Per guidelines, if "Requested entity was not found" occurs, prompt user to select key again.
-      (window as any).aistudio?.openSelectKey();
-      return "Model or resource not found. Re-selecting your API key may fix this.";
+    const message = (error.message || error.toString() || "").toLowerCase();
+
+    if (message.includes("400") || message.includes("invalid_argument")) {
+      return "Invalid request configuration. Your prompt may be too long or contain unsupported characters.";
     }
-    return message || "A connection error occurred.";
+    if (message.includes("401") || message.includes("unauthenticated")) {
+       return "Authentication failed. Please verify your API key.";
+    }
+    if (message.includes("403") || message.includes("permission_denied")) {
+      return "Access denied. Please ensure your Google Cloud project has billing enabled.";
+    }
+    if (message.includes("404") || message.includes("not_found") || message.includes("requested entity was not found")) {
+      try {
+        (window as any).aistudio?.openSelectKey();
+      } catch (e) { console.warn("Key selector not available"); }
+      return "Model resource unavailable. We are prompting you to re-select your API key.";
+    }
+    if (message.includes("429") || message.includes("resource_exhausted")) {
+      return "Traffic limit reached. Please wait a moment and try again.";
+    }
+    if (message.includes("500") || message.includes("internal")) {
+      return "Google internal server error. Please try again later.";
+    }
+    if (message.includes("503") || message.includes("unavailable") || message.includes("overloaded")) {
+      return "AI Service is currently overloaded. Please try again in a few seconds.";
+    }
+    if (message.includes("safety") || message.includes("blocked")) {
+      return "Generation blocked by safety filters. Please modify your prompt to be more family-friendly.";
+    }
+    if (message.includes("fetch failed") || message.includes("network")) {
+      return "Network connection failed. Please check your internet.";
+    }
+
+    return "An unexpected error occurred during generation. Please try again.";
   }
 
   static async generateCharacterAlias(member: Partial<CastMember>, alignment: Alignment): Promise<string> {
@@ -39,12 +62,10 @@ export class GeminiService {
       const ai = this.getAI();
       const isVillain = alignment === 'villain';
       const prompt = `Generate a unique, cool, and cinematic ${isVillain ? 'VILLAIN' : 'superhero'} name for a ${member.species} named ${member.name}. Traits: ${member.traits}. Return only the name.${this.getSafetyPrompt()}`;
-      // Use ai.models.generateContent to query GenAI with both model and prompt
       const response = await ai.models.generateContent({
         model: 'gemini-3-flash-preview',
         contents: [{ parts: [{ text: prompt }] }],
       });
-      // Use .text property, NOT .text() method
       return response.text?.trim() || (isVillain ? "The Shadow" : "The Guardian");
     } catch (err) { throw new Error(this.handleError(err)); }
   }
@@ -58,7 +79,6 @@ export class GeminiService {
         contents: [{ parts: [{ text: prompt }] }],
         config: { responseMimeType: "application/json" }
       });
-      // Use .text property, NOT .text() method
       return JSON.parse(response.text || "{}");
     } catch (err) { throw new Error(this.handleError(err)); }
   }
@@ -71,7 +91,6 @@ export class GeminiService {
         model: 'gemini-3-flash-preview',
         contents: [{ parts: [{ text: prompt }] }],
       });
-      // Use .text property, NOT .text() method
       return response.text?.trim() || "Epic Gear";
     } catch (err) { throw new Error(this.handleError(err)); }
   }
@@ -85,7 +104,6 @@ export class GeminiService {
         model: 'gemini-3-flash-preview',
         contents: [{ parts: [{ text: prompt }] }],
       });
-      // Use .text property, NOT .text() method
       return response.text?.trim() || "An epic showdown.";
     } catch (err) { throw new Error(this.handleError(err)); }
   }
@@ -157,11 +175,14 @@ export class GeminiService {
       }
       const enhancedPrompt = `STYLE: ${styleDescriptor}. MOTION: ${animationPreset}. ACTION: ${prompt}. Maintain strict animal anatomy and character consistency with references.${this.getSafetyPrompt()}`;
       
-      // Veo Guidelines enforcement for multiple reference images
-      const hasMultipleRefs = referenceImages.length > 1;
-      const modelName = (hasMultipleRefs || baseVideoMeta || startingFrameBase64) ? 'veo-3.1-generate-preview' : 'veo-3.1-fast-generate-preview';
+      // Veo Guidelines:
+      // - veo-3.1-fast-generate-preview supports Text-to-Video and Image-to-Video (single image).
+      // - veo-3.1-generate-preview supports Video Editing, Extension, and Multiple Reference Images.
+      const hasMultipleRefs = referenceImages.length > 0;
+      const usePro = hasMultipleRefs || baseVideoMeta;
+      const modelName = usePro ? 'veo-3.1-generate-preview' : 'veo-3.1-fast-generate-preview';
       
-      // For multiple reference images, model must be 'veo-3.1-generate-preview', aspect ratio must be '16:9', and resolution must be '720p'.
+      // Constraints for Multiple Reference Images: model 'veo-3.1-generate-preview', 16:9, 720p.
       const finalAspectRatio = hasMultipleRefs ? '16:9' : aspectRatio;
       const finalResolution = hasMultipleRefs ? '720p' : resolution;
 
@@ -171,27 +192,44 @@ export class GeminiService {
         aspectRatio: finalAspectRatio 
       };
 
-      const params: any = { model: modelName, prompt: enhancedPrompt, config: videoConfig };
+      const params: any = { 
+        model: modelName, 
+        prompt: enhancedPrompt, 
+        config: videoConfig 
+      };
+
       if (baseVideoMeta) params.video = baseVideoMeta;
-      if (startingFrameBase64) params.image = { imageBytes: startingFrameBase64.replace(/^data:image\/\w+;base64,/, ""), mimeType: 'image/png' };
       
-      if (referenceImages.length > 0) {
+      // Use "image" for single-image starting frame (Image-to-Video)
+      if (startingFrameBase64) {
+        params.image = { 
+          imageBytes: startingFrameBase64.replace(/^data:image\/\w+;base64,/, ""), 
+          mimeType: 'image/png' 
+        };
+      }
+      
+      // Use "referenceImages" for style/character references (up to 3)
+      if (hasMultipleRefs) {
         params.config.referenceImages = referenceImages.map(img => ({ 
-          image: { imageBytes: img.replace(/^data:image\/\w+;base64,/, ""), mimeType: 'image/png' }, 
+          image: { 
+            imageBytes: img.replace(/^data:image\/\w+;base64,/, ""), 
+            mimeType: 'image/png' 
+          }, 
           referenceType: 'ASSET' 
         })).slice(0, 3);
       }
 
       let operation = await ai.models.generateVideos(params);
       while (!operation.done) { 
-        await new Promise(r => setTimeout(r, 8000)); 
+        await new Promise(r => setTimeout(r, 10000)); 
         operation = await ai.operations.getVideosOperation({ operation }); 
       }
 
       const downloadLink = operation.response?.generatedVideos?.[0]?.video?.uri;
-      if (!downloadLink) throw new Error("Video failed");
+      if (!downloadLink) throw new Error("Video synthesis failed. No download link provided.");
       
       const res = await fetch(`${downloadLink}&key=${process.env.API_KEY}`);
+      if (!res.ok) throw new Error("Failed to download synthesized video.");
       const blob: any = await res.blob();
       return { url: URL.createObjectURL(blob), videoMeta: operation.response?.generatedVideos?.[0]?.video };
     } catch (err) { throw new Error(this.handleError(err)); }
@@ -208,7 +246,7 @@ export class GeminiService {
         video: previousVideo,
         config: {
           numberOfVideos: 1,
-          resolution: '720p', // Extension requires 720p resolution per guidelines
+          resolution: '720p', 
           aspectRatio: aspectRatio,
         }
       });
