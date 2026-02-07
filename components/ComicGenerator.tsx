@@ -129,9 +129,19 @@ export const ComicGenerator: React.FC<ComicGeneratorProps> = ({ onGenerated, onA
               )}
 
               {step === 4 && (
-                <div className="text-center py-10">
-                   <h3 className="text-3xl font-comic uppercase text-white">STORY COMPLETE!</h3>
-                   <button onClick={() => setStep(1)} className="mt-8 w-full py-4 bg-zinc-950 text-white border-4 border-black font-comic text-xl uppercase shadow-[4px_4px_0px_#000]">NEW ISSUE</button>
+                <div className="space-y-4 animate-in fade-in duration-500 py-6">
+                   <h3 className="text-4xl font-comic uppercase text-white text-center">ISSUE COMPLETE!</h3>
+                   <div className="space-y-3 pt-4">
+                      <button 
+                        onClick={() => lastGenerated && onAnimate(lastGenerated.id)} 
+                        className="w-full py-5 bg-cyan-400 border-4 border-black text-black font-comic text-3xl uppercase shadow-[6px_6px_0px_0px_#000] hover:translate-x-1 hover:translate-y-1 hover:shadow-none transition-all flex items-center justify-center gap-3"
+                      >
+                        <span>🎬 ANIMATE THIS ISSUE</span>
+                      </button>
+                      <button onClick={() => setStep(1)} className="w-full py-4 bg-zinc-800 text-white border-4 border-black font-comic text-xl uppercase shadow-[4px_4px_0px_0px_#000] hover:bg-zinc-700">
+                        START NEW STORY
+                      </button>
+                   </div>
                 </div>
               )}
            </div>

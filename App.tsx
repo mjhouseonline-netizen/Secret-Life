@@ -22,6 +22,7 @@ const App: React.FC = () => {
   const [history, setHistory] = useState<GeneratedContent[]>([]);
   const [user, setUser] = useState<User | null>(null);
   const [hasError, setHasError] = useState(false);
+  const [pendingVideoId, setPendingVideoId] = useState<string | null>(null);
 
   const checkMonthlyReset = (currentUser: User): User => {
     if (currentUser.role === 'admin') return currentUser;
@@ -116,9 +117,20 @@ const App: React.FC = () => {
     switch (activeView) {
       case 'home': return <Home user={user} history={history} setActiveView={setActiveView} />;
       case 'poster': return <PosterGenerator onGenerated={handleNewContent} />;
-      case 'comic': return <ComicGenerator onGenerated={handleNewContent} onAnimate={() => setActiveView('video')} availableCharacters={history.filter(i => i.type === 'poster')} />;
+      case 'comic': return <ComicGenerator 
+        onGenerated={handleNewContent} 
+        onAnimate={(id) => {
+          setPendingVideoId(id);
+          setActiveView('video');
+        }} 
+        availableCharacters={history.filter(i => i.type === 'poster')} 
+      />;
       case 'book': return <BookGenerator onGenerated={handleNewContent} availableAssets={bookAssets} />;
-      case 'video': return <VideoGenerator onGenerated={handleNewContent} availableImages={imagesOnly} />;
+      case 'video': return <VideoGenerator 
+        onGenerated={handleNewContent} 
+        availableImages={imagesOnly} 
+        initialSelectedId={pendingVideoId} 
+      />;
       case 'video-editor': return <VideoEditor onGenerated={handleNewContent} availableVideos={videosOnly} availableImages={imagesOnly} />;
       case 'edit': return <EditStudio onGenerated={handleNewContent} availableImages={imagesOnly} />;
       case 'analyze': return <IntelligenceStudio />;
