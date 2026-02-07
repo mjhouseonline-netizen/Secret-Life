@@ -167,6 +167,8 @@ const App: React.FC = () => {
             localStorage.clear();
             window.location.reload();
           }}
+          onViewPrivacy={() => setActiveView('privacy')}
+          onViewTerms={() => setActiveView('terms')}
         />
       );
       case 'history': return (

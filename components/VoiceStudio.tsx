@@ -187,7 +187,7 @@ export const VoiceStudio: React.FC = () => {
               </div>
             )}
             
-            {loading || cloningLoading && (
+            {(loading || cloningLoading) && (
               <div className="absolute inset-0 bg-white/80 z-20 flex flex-col items-center justify-center p-12 text-center animate-in fade-in">
                 <div className="w-16 h-16 border-4 border-black border-t-cyan-400 rounded-full animate-spin mb-4"></div>
                 <p className="text-black text-xs font-black uppercase tracking-widest animate-pulse">Processing Neural Stream...</p>
