@@ -13,6 +13,7 @@ import { EditStudio } from './components/EditStudio';
 import { IntelligenceStudio } from './components/IntelligenceStudio';
 import { AudioStudio } from './components/AudioStudio';
 import { SettingsStudio } from './components/SettingsStudio';
+import { CloudService } from './services/cloud';
 import { AppView, GeneratedContent, User, UserSettings } from './types';
 
 const MONTHLY_FREE_QUOTA = 100;
@@ -81,6 +82,13 @@ const App: React.FC = () => {
     localStorage.setItem('cinepet_current_user', JSON.stringify(updatedUser));
   };
 
+  const handleCloudAuth = (accessToken: string) => {
+    if (!user) return;
+    const updatedUser = { ...user, cloudAccessToken: accessToken };
+    setUser(updatedUser);
+    localStorage.setItem('cinepet_current_user', JSON.stringify(updatedUser));
+  };
+
   const handleNewContent = (content: GeneratedContent) => {
     if (user && user.role !== 'admin' && user.credits < 5) {
       alert("CREDIT EXHAUSTION!");
@@ -89,12 +97,21 @@ const App: React.FC = () => {
     const updatedHistory = [content, ...history];
     setHistory(updatedHistory);
     localStorage.setItem('cinepet_history', JSON.stringify(updatedHistory));
-    
+
     if (user && user.role !== 'admin') {
       const updatedUser = { ...user, credits: Math.max(0, user.credits - 5) };
       setUser(updatedUser);
       localStorage.setItem('cinepet_current_user', JSON.stringify(updatedUser));
     }
+
+    if (user?.settings?.autoCloudSync && user.cloudAccessToken && content.url) {
+      const mimeType = content.type === 'video' ? 'video/mp4' : 'image/png';
+      const ext = content.type === 'video' ? 'mp4' : 'png';
+      const fileName = `cinepet_${content.type}_${content.id}.${ext}`;
+      CloudService.uploadToGoogleDrive(user.cloudAccessToken, content.url, fileName, mimeType)
+        .catch(() => { /* sync is best-effort; token may have expired */ });
+    }
+
     setActiveView('history');
   };
 
@@ -137,14 +154,15 @@ const App: React.FC = () => {
       case 'live':
       case 'speech': return <AudioStudio />;
       case 'settings': return (
-        <SettingsStudio 
-          user={user} 
-          onUpdateSettings={handleUpdateSettings} 
-          onLogout={handleLogout} 
+        <SettingsStudio
+          user={user}
+          onUpdateSettings={handleUpdateSettings}
+          onCloudAuth={handleCloudAuth}
+          onLogout={handleLogout}
           onDeleteAccount={() => {
             localStorage.clear();
             window.location.reload();
-          }} 
+          }}
         />
       );
       case 'history': return (

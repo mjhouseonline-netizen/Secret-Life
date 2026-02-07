@@ -1,19 +1,19 @@
 
 import React, { useState, useEffect } from 'react';
 import { User, UserSettings } from '../types';
+import { getGoogleClientId } from '../config';
 
 interface SettingsStudioProps {
   user: User;
   onUpdateSettings: (settings: UserSettings) => void;
+  onCloudAuth: (accessToken: string) => void;
   onLogout: () => void;
   onDeleteAccount: () => void;
   onViewPrivacy?: () => void;
   onViewTerms?: () => void;
 }
 
-const DEFAULT_CLIENT_ID = '1042356611430-qa2i8o4fgavdqu9ivvtq9i1qdlpomp5p.apps.googleusercontent.com';
-
-export const SettingsStudio: React.FC<SettingsStudioProps> = ({ user, onUpdateSettings, onLogout, onDeleteAccount, onViewPrivacy, onViewTerms }) => {
+export const SettingsStudio: React.FC<SettingsStudioProps> = ({ user, onUpdateSettings, onCloudAuth, onLogout, onDeleteAccount, onViewPrivacy, onViewTerms }) => {
   const [isAuthorizing, setIsAuthorizing] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
   const [hasApiKey, setHasApiKey] = useState(false);
@@ -45,15 +45,6 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ user, onUpdateSe
     }
   };
 
-  const getGoogleClientId = () => {
-    try {
-      if (typeof process !== 'undefined' && process.env?.GOOGLE_CLIENT_ID) {
-        return process.env.GOOGLE_CLIENT_ID;
-      }
-    } catch (e) {}
-    return DEFAULT_CLIENT_ID;
-  };
-
   const toggleSetting = (key: keyof UserSettings) => {
     onUpdateSettings({
       ...settings,
@@ -80,7 +71,7 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ user, onUpdateSe
           if (response.error) {
             setAuthError(response.error_description || "AUTHORIZATION DENIED");
           } else {
-            window.dispatchEvent(new CustomEvent('cloud-auth-success', { detail: response.access_token }));
+            onCloudAuth(response.access_token);
             onUpdateSettings({
               ...settings,
               autoCloudSync: true
