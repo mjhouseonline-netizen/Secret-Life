@@ -4,7 +4,7 @@ import { User } from '../types';
 
 interface AuthProps { onLogin: (user: User) => void; }
 
-// Fallback ID if not provided by environment
+// Current placeholder ID
 const DEFAULT_CLIENT_ID = '1042356611430-qa2i8o4fgavdqu9ivvtq9i1qdlpomp5p.apps.googleusercontent.com';
 
 export const Auth: React.FC<AuthProps> = ({ onLogin }) => {
@@ -12,6 +12,7 @@ export const Auth: React.FC<AuthProps> = ({ onLogin }) => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [googleStatus, setGoogleStatus] = useState<'loading' | 'ready' | 'error'>('loading');
   const googleBtnRef = useRef<HTMLDivElement>(null);
 
   const getGoogleClientId = () => {
@@ -25,19 +26,32 @@ export const Auth: React.FC<AuthProps> = ({ onLogin }) => {
 
   useEffect(() => {
     let checkGsi: any;
+    let attempts = 0;
     const initGsi = () => {
       const google = (window as any).google;
       if (google?.accounts?.id) {
-        google.accounts.id.initialize({
-          client_id: getGoogleClientId(),
-          callback: handleGoogleResponse,
-          auto_select: false,
-        });
-        if (googleBtnRef.current) {
-          google.accounts.id.renderButton(googleBtnRef.current, { 
-            theme: 'filled_black', size: 'large', text: 'signin_with', width: 320 
+        try {
+          google.accounts.id.initialize({
+            client_id: getGoogleClientId(),
+            callback: handleGoogleResponse,
+            auto_select: false,
+            ux_mode: 'popup'
           });
+          if (googleBtnRef.current) {
+            google.accounts.id.renderButton(googleBtnRef.current, { 
+              theme: 'filled_black', size: 'large', text: 'signin_with', width: 320 
+            });
+            setGoogleStatus('ready');
+          }
+          return true;
+        } catch (e) {
+          setGoogleStatus('error');
+          return true;
         }
+      }
+      attempts++;
+      if (attempts > 50) {
+        setGoogleStatus('error');
         return true;
       }
       return false;
@@ -60,15 +74,17 @@ export const Auth: React.FC<AuthProps> = ({ onLogin }) => {
         lastCreditReset: Date.now(),
         cloudProvider: 'google'
       });
-    } catch (err) { setError('AUTHENTICATION DENIED BY PROVIDER'); }
+    } catch (err) { 
+      setError('POLICY BLOCK: CHECK GOOGLE CLOUD CONSOLE ORIGINS'); 
+    }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleManualSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!username || !password) { setError('IDENTIFICATION REQUIRED!'); return; }
+    if (!username) { setError('DIRECTOR CODENAME REQUIRED!'); return; }
     onLogin({
-      id: Math.random().toString(36).substr(2, 9),
-      username,
+      id: `local_${Math.random().toString(36).substr(2, 9)}`,
+      username: username.toUpperCase(),
       role: 'user',
       credits: 100,
       lastCreditReset: Date.now(),
@@ -77,21 +93,12 @@ export const Auth: React.FC<AuthProps> = ({ onLogin }) => {
   };
 
   return (
-    <div className="min-h-screen bg-blue-700 flex items-center justify-center p-6 relative overflow-hidden">
-      {/* Action-Oriented Background FX */}
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_#2563eb_0%,_#1e3a8a_100%)] opacity-100"></div>
+    <div className="min-h-screen bg-action-blue flex items-center justify-center p-6 relative overflow-hidden">
       <div className="absolute inset-0 halftone opacity-30 pointer-events-none"></div>
       
-      {/* Action Lines (Conic Burst) */}
+      {/* Action Burst Backdrop */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none opacity-20">
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[200%] h-[200%] bg-[conic-gradient(from_0deg,_transparent_0deg,_transparent_15deg,_white_15.1deg,_white_16deg,_transparent_16.1deg)] animate-spin [animation-duration:60s]"></div>
-      </div>
-
-      <div className="absolute top-10 right-10 rotate-12 hidden md:block">
-        <div className="bg-magenta-500 border-4 border-black px-6 py-3 shadow-[8px_8px_0px_#000] font-comic text-4xl text-white stroke-black-bold">WHAM!</div>
-      </div>
-      <div className="absolute bottom-10 left-10 -rotate-6 hidden md:block">
-        <div className="bg-yellow-400 border-4 border-black px-8 py-4 shadow-[8px_8px_0px_#000] font-comic text-4xl text-black">POW!</div>
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[300%] h-[300%] bg-[conic-gradient(from_0deg,_transparent_0deg,_transparent_15deg,_white_15.1deg,_white_16deg,_transparent_16.1deg)] animate-spin [animation-duration:120s]"></div>
       </div>
 
       <div className="max-w-md w-full relative z-20">
@@ -99,8 +106,8 @@ export const Auth: React.FC<AuthProps> = ({ onLogin }) => {
            <h1 className="text-8xl font-comic text-white stroke-black-bold drop-shadow-[10px_10px_0px_#000] uppercase leading-none mb-2">
              SECRET LIFE!
            </h1>
-           <div className="bg-yellow-400 text-black px-4 py-1 inline-block text-[10px] font-black uppercase tracking-[0.4em] border-2 border-black shadow-[4px_4px_0px_#000]">
-             STUDIO ACCESS
+           <div className="bg-yellow-400 text-black px-4 py-1 inline-block text-[10px] font-black uppercase tracking-[0.4em] border-4 border-black shadow-[4px_4px_0px_#000]">
+             PRODUCTION CLEARANCE
            </div>
         </div>
 
@@ -109,68 +116,65 @@ export const Auth: React.FC<AuthProps> = ({ onLogin }) => {
           
           <div className="relative z-10 space-y-8">
             <div className="text-center">
-              <h2 className="text-4xl font-comic text-black uppercase mb-1">{isLogin ? 'ENTER STUDIO' : 'SIGN CONTRACT'}</h2>
-              <div className="h-1.5 w-24 bg-magenta-500 mx-auto border-2 border-black mt-1"></div>
+              <h2 className="text-4xl font-comic text-black uppercase mb-1">STUDIO ENTRANCE</h2>
+              <div className="h-2 w-24 bg-magenta-500 mx-auto border-2 border-black mt-2"></div>
             </div>
 
-            <div className="flex justify-center py-2">
-              <div ref={googleBtnRef} className="border-4 border-black shadow-[6px_6px_0px_#000] transition-all hover:translate-x-1 hover:translate-y-1 hover:shadow-none cursor-pointer"></div>
+            {/* Path A: Google (Might be blocked) */}
+            <div className="space-y-4">
+              <div className="flex justify-center">
+                {googleStatus === 'loading' ? (
+                  <div className="w-full h-12 bg-zinc-100 animate-pulse border-4 border-black"></div>
+                ) : googleStatus === 'error' ? (
+                  <div className="text-[10px] font-black text-red-600 bg-red-50 border-2 border-red-600 p-2 uppercase text-center w-full">
+                    OAuth Engine Blocked by Policy
+                  </div>
+                ) : (
+                  <div ref={googleBtnRef} className="border-4 border-black shadow-[6px_6px_0px_#000] hover:translate-x-1 hover:translate-y-1 hover:shadow-none transition-all cursor-pointer"></div>
+                )}
+              </div>
             </div>
             
-            <div className="relative flex items-center gap-2 py-2">
+            <div className="relative flex items-center gap-2">
               <div className="flex-1 h-1 bg-black"></div>
-              <span className="text-[10px] font-black text-blue-900 uppercase tracking-widest bg-white px-2">OR USE STUDIO ID</span>
+              <span className="text-[10px] font-black text-blue-900 uppercase tracking-widest bg-white px-2 italic">OR OVERRIDE</span>
               <div className="flex-1 h-1 bg-black"></div>
             </div>
 
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <input 
-                type="text" 
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                placeholder="CODENAME (e.g. BUBBLES)"
-                className="w-full bg-blue-50 border-4 border-black p-4 text-blue-950 font-black outline-none placeholder:text-blue-300 uppercase focus:bg-white text-lg"
-              />
-              <input 
-                type="password" 
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="CLEARANCE KEY"
-                className="w-full bg-blue-50 border-4 border-black p-4 text-blue-950 font-black outline-none placeholder:text-blue-300 uppercase focus:bg-white text-lg"
-              />
+            {/* Path B: Directorial Override (Local Login) */}
+            <form onSubmit={handleManualSubmit} className="space-y-4">
+              <div className="space-y-1">
+                <label className="text-[8px] font-black uppercase text-zinc-400 ml-1">CODENAME / PET NAME</label>
+                <input 
+                  type="text" 
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  placeholder="EX: COMMANDER BARK"
+                  className="w-full bg-blue-50 border-4 border-black p-4 text-blue-950 font-black outline-none placeholder:text-blue-300 uppercase focus:bg-white text-lg shadow-inner"
+                />
+              </div>
               
-              {error && <p className="text-red-600 text-[10px] font-black text-center uppercase animate-bounce border-2 border-red-600 py-2 bg-red-50 shadow-[4px_4px_0px_#000]">{error}</p>}
+              {error && <p className="text-red-600 text-[9px] font-black text-center uppercase animate-pulse border-2 border-red-200 py-2 bg-red-50">{error}</p>}
 
               <button 
                 type="submit"
-                className="w-full py-6 bg-yellow-400 hover:bg-yellow-300 text-black border-4 border-black font-comic text-5xl uppercase shadow-[10px_10px_0px_0px_#000] active:translate-x-1 active:translate-y-1 active:shadow-none transition-all group-hover:rotate-1"
+                className="w-full py-6 bg-yellow-400 hover:bg-yellow-300 text-black border-4 border-black font-comic text-5xl uppercase shadow-[10px_10px_0px_0px_#000] active:translate-x-1 active:translate-y-1 active:shadow-none transition-all transform hover:rotate-1"
               >
-                {isLogin ? 'START INK' : 'SIGN!'}
+                PRODUCE!
               </button>
             </form>
 
-            <button 
-              onClick={() => setIsLogin(!isLogin)}
-              className="w-full text-[11px] text-blue-900 font-black uppercase hover:text-magenta-600 transition-colors tracking-widest"
-            >
-              {isLogin ? "No badge? Request access here" : "Returning Director? Login here"}
-            </button>
+            <p className="text-[9px] text-center text-zinc-400 font-bold uppercase tracking-wider px-4">
+              * Override sessions are stored in your local studio archive. Cloud sync requires valid Google Clearance.
+            </p>
           </div>
         </div>
         
         <div className="mt-10 flex justify-between text-white font-bold text-[9px] uppercase tracking-widest px-2 drop-shadow-[2px_2px_0px_#000]">
-          <span>ISSUE #001 • 2025</span>
-          <span>© CINEPET CREATIVE CORP</span>
+          <span>VOL. 25 • STUDIO EDITION</span>
+          <span>© CINEPET CREATIVE</span>
         </div>
       </div>
-
-      <style>{`
-        .halftone {
-          background-image: radial-gradient(circle, currentColor 1px, transparent 1px);
-          background-size: 8px 8px;
-        }
-        .stroke-black-bold { -webkit-text-stroke: 3px black; }
-      `}</style>
     </div>
   );
 };

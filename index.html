@@ -9,9 +9,10 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Secret Life">
   
-  <!-- Critical for Google Identity Services / OAuth Popups -->
-  <meta http-equiv="Permissions-Policy" content="identity-credentials-get=(self)">
+  <!-- Critical for Google Identity Services / OAuth Policy Compliance -->
   <meta http-equiv="Cross-Origin-Opener-Policy" content="same-origin-allow-popups">
+  <meta http-equiv="Cross-Origin-Embedder-Policy" content="unsafe-none">
+  <meta name="referrer" content="no-referrer-when-downgrade">
 
   <link rel="manifest" href="manifest.json">
   <script src="https://cdn.tailwindcss.com"></script>
@@ -42,7 +43,16 @@
     .custom-scrollbar::-webkit-scrollbar { width: 6px; }
     .custom-scrollbar::-webkit-scrollbar-track { background: #09090b; }
     .custom-scrollbar::-webkit-scrollbar-thumb { background: #27272a; border-radius: 0; }
-    .stroke-black-bold { -webkit-text-stroke: 2px black; }
+    .stroke-black-bold { -webkit-text-stroke: 3px black; }
+    
+    /* Comic Action Gradient */
+    .bg-action-blue {
+      background: radial-gradient(circle at center, #2563eb 0%, #1e3a8a 100%);
+    }
+    .halftone {
+      background-image: radial-gradient(circle, currentColor 1px, transparent 1px);
+      background-size: 8px 8px;
+    }
   </style>
 <script type="importmap">
 {
