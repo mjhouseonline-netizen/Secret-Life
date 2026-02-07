@@ -72,10 +72,6 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ user, onUpdateSe
             setAuthError(response.error_description || "AUTHORIZATION DENIED");
           } else {
             onCloudAuth(response.access_token);
-            onUpdateSettings({
-              ...settings,
-              autoCloudSync: true
-            });
           }
           setIsAuthorizing(false);
         },

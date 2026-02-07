@@ -84,7 +84,11 @@ const App: React.FC = () => {
 
   const handleCloudAuth = (accessToken: string) => {
     if (!user) return;
-    const updatedUser = { ...user, cloudAccessToken: accessToken };
+    const updatedUser = {
+      ...user,
+      cloudAccessToken: accessToken,
+      settings: { ...(user.settings || { safeMode: true, hdByDefault: false, autoCloudSync: false }), autoCloudSync: true }
+    };
     setUser(updatedUser);
     localStorage.setItem('cinepet_current_user', JSON.stringify(updatedUser));
   };
