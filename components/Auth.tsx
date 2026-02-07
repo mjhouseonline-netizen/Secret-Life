@@ -1,10 +1,9 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { User } from '../types';
+import { getGoogleClientId } from '../config';
 
 interface AuthProps { onLogin: (user: User) => void; }
-
-const DEFAULT_CLIENT_ID = '1042356611430-qa2i8o4fgavdqu9ivvtq9i1qdlpomp5p.apps.googleusercontent.com';
 
 export const Auth: React.FC<AuthProps> = ({ onLogin }) => {
   const [isLogin, setIsLogin] = useState(true);
@@ -13,15 +12,6 @@ export const Auth: React.FC<AuthProps> = ({ onLogin }) => {
   const [error, setError] = useState('');
   const [googleStatus, setGoogleStatus] = useState<'loading' | 'ready' | 'error'>('loading');
   const googleBtnRef = useRef<HTMLDivElement>(null);
-
-  const getGoogleClientId = () => {
-    try {
-      if (typeof process !== 'undefined' && process.env?.GOOGLE_CLIENT_ID) {
-        return process.env.GOOGLE_CLIENT_ID;
-      }
-    } catch (e) {}
-    return DEFAULT_CLIENT_ID;
-  };
 
   useEffect(() => {
     let checkGsi: any;
@@ -60,9 +50,17 @@ export const Auth: React.FC<AuthProps> = ({ onLogin }) => {
   }, []);
 
   const handleGoogleResponse = (response: any) => {
+    if (!response?.credential) {
+      setError('Google sign-in failed: no credential received. Check that the app origin is authorized in Google Cloud Console.');
+      return;
+    }
     try {
       const base64Url = response.credential.split('.')[1];
       const payload = JSON.parse(atob(base64Url.replace(/-/g, '+').replace(/_/g, '/')));
+      if (!payload.sub) {
+        setError('Google sign-in returned an invalid token. Please try again.');
+        return;
+      }
       onLogin({
         id: payload.sub,
         username: payload.name || 'Studio Director',
@@ -73,8 +71,8 @@ export const Auth: React.FC<AuthProps> = ({ onLogin }) => {
         lastCreditReset: Date.now(),
         cloudProvider: 'google'
       });
-    } catch (err) { 
-      setError('POLICY BLOCK: CHECK GOOGLE CLOUD CONSOLE ORIGINS'); 
+    } catch (err) {
+      setError('Failed to process Google sign-in response. Please try again or use manual login.');
     }
   };
 
