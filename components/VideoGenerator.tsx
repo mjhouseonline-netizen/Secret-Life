@@ -178,8 +178,8 @@ export const VideoGenerator: React.FC<VideoGeneratorProps> = ({ onGenerated, ava
                   onChange={(e) => setSelectedPreset(e.target.value as AnimationPreset)}
                   className="w-full bg-zinc-950 border-none rounded-xl p-3 text-[10px] font-black text-white focus:ring-1 focus:ring-indigo-500 appearance-none uppercase"
                 >
-                  {Object.keys(AnimationPreset).map(preset => (
-                    <option key={preset} value={preset}>{preset.replace(/_/g, ' ')}</option>
+                  {Object.entries(AnimationPreset).map(([key, value]) => (
+                    <option key={key} value={value}>{value}</option>
                   ))}
                 </select>
               </div>
