@@ -145,11 +145,12 @@ export class GeminiService {
     } catch (err) { throw new Error(this.handleError(err)); }
   }
 
-  static async generatePoster(scenario: string, aspectRatio: AspectRatio, style: PosterStyle, cast: CastMember[], alignment: Alignment, imageSize: ImageSize = ImageSize.K1) {
+  static async generatePoster(scenario: string, aspectRatio: AspectRatio, style: PosterStyle, cast: CastMember[], alignment: Alignment, imageSize: ImageSize = ImageSize.K1, productionType: 'movie' | 'comic' = 'movie') {
     try {
       const ai = this.getAI();
-      const castDescs = cast.map(m => `CHARACTER: ${m.name} as "${m.alias}". Species: ${m.species}. OUTFIT: ${m.outfit}.`).join("\n");
-      const visualPrompt = `Blockbuster movie poster: ${alignment}. CAST:\n${castDescs}\nSCENE: ${scenario}. STYLE: ${style}. ${this.getSafetyPrompt()}`;
+      const castDescs = cast.map(m => `CHARACTER: ${m.name} as "${m.alias}". Species: ${m.species}. Gender: ${m.gender}. OUTFIT: ${m.outfit}.`).join("\n");
+      const productionLabel = productionType === 'movie' ? 'Blockbuster movie poster' : 'Comic book variant cover';
+      const visualPrompt = `${productionLabel}: ${alignment}. Include dramatic branding, titles, and ${productionType === 'movie' ? 'credit block' : 'issue number/logo trade dress'}. CAST:\n${castDescs}\nSCENE: ${scenario}. STYLE: ${style}. ${this.getSafetyPrompt()}`;
       
       const parts: any[] = [];
       cast.forEach(c => c.referenceImages.forEach(img => parts.push({ inlineData: { data: img.split(',')[1], mimeType: 'image/png' } })));
@@ -173,7 +174,7 @@ export class GeminiService {
   static async generateComic(profile: CharacterProfile, meta: ComicMetadata, style: ComicStyle, sourceImageUrl: string): Promise<string> {
     try {
       const ai = this.getAI();
-      const prompt = `4-panel comic strip. STYLE: ${style}. HERO: ${profile.petName} (${profile.species}, ${profile.alignment}) wearing ${profile.outfit}. VILLAIN: ${meta.villainName} (${meta.villainType}). PLOT: ${meta.villainTrait}. STORY ENDING: ${meta.storyEnding}. ${this.getSafetyPrompt()}`;
+      const prompt = `4-panel comic strip. STYLE: ${style}. HERO: ${profile.petName} (${profile.species}, ${profile.gender}, ${profile.alignment}) wearing ${profile.outfit}. VILLAIN: ${meta.villainName} (${meta.villainType}). PLOT: ${meta.villainTrait}. STORY ENDING: ${meta.storyEnding}. ${this.getSafetyPrompt()}`;
       
       const response = await ai.models.generateContent({
         model: 'gemini-3-pro-image-preview',

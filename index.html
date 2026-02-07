@@ -9,7 +9,6 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Secret Life">
   
-  <!-- Critical for Google Identity Services / OAuth Policy Compliance -->
   <meta http-equiv="Cross-Origin-Opener-Policy" content="same-origin-allow-popups">
   <meta http-equiv="Cross-Origin-Embedder-Policy" content="unsafe-none">
   <meta name="referrer" content="no-referrer-when-downgrade">
@@ -17,7 +16,6 @@
   <link rel="manifest" href="manifest.json">
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://js.stripe.com/v3/"></script>
-  <!-- Google Identity Services Library -->
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   
   <link href="https://fonts.googleapis.com/css2?family=Bangers&family=Comic+Neue:wght@400;700&family=Bebas+Neue&display=swap" rel="stylesheet">
@@ -30,8 +28,8 @@
     }
     body {
       font-family: 'Comic Neue', cursive;
-      background-color: #09090b;
-      color: #fff;
+      background-color: #0f172a; /* Slate 900 */
+      color: #1e293b;
       -webkit-tap-highlight-color: transparent;
       user-select: none;
       touch-action: manipulation;
@@ -41,17 +39,45 @@
     .safe-top { padding-top: var(--sat); }
     .safe-bottom { padding-bottom: var(--sab); }
     .custom-scrollbar::-webkit-scrollbar { width: 6px; }
-    .custom-scrollbar::-webkit-scrollbar-track { background: #09090b; }
-    .custom-scrollbar::-webkit-scrollbar-thumb { background: #27272a; border-radius: 0; }
+    .custom-scrollbar::-webkit-scrollbar-track { background: #0f172a; }
+    .custom-scrollbar::-webkit-scrollbar-thumb { background: #334155; border-radius: 0; }
     .stroke-black-bold { -webkit-text-stroke: 3px black; }
+    .stroke-black-thin { -webkit-text-stroke: 1.5px black; }
     
-    /* Comic Action Gradient */
+    /* Vibrant Electric Dark Blue Background */
     .bg-action-blue {
-      background: radial-gradient(circle at center, #2563eb 0%, #1e3a8a 100%);
+      background: #1e3a8a; /* Electric Blue-900 */
     }
-    .halftone {
-      background-image: radial-gradient(circle, currentColor 1px, transparent 1px);
-      background-size: 8px 8px;
+
+    /* Comic Hatching - Subtle and light on dark, dark on light */
+    .comic-hatch {
+      background-image: repeating-linear-gradient(
+        45deg,
+        rgba(0,0,0,0.03),
+        rgba(0,0,0,0.03) 1px,
+        transparent 1px,
+        transparent 12px
+      );
+    }
+    
+    .comic-panel {
+      border: 4px solid black;
+      box-shadow: 8px 8px 0px 0px rgba(0,0,0,1);
+      background-color: #ffffff;
+    }
+
+    .input-comic {
+      background-color: #f8fafc;
+      border: 4px solid black;
+      padding: 1rem;
+      font-weight: 900;
+      color: #0f172a;
+      text-transform: uppercase;
+      outline: none;
+    }
+    .input-comic:focus {
+      background-color: #ffffff;
+      border-color: #22d3ee;
     }
   </style>
 <script type="importmap">

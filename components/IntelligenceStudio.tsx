@@ -36,18 +36,19 @@ export const IntelligenceStudio: React.FC = () => {
   };
 
   return (
-    <div className="space-y-8">
-      <div>
-        <h2 className="text-4xl font-bold mb-2 uppercase tracking-widest font-cinematic">Intelligence Studio</h2>
-        <p className="text-zinc-400 uppercase text-[10px] font-bold">Deep analysis of images and videos using Gemini 3 Pro.</p>
+    <div className="space-y-10 pb-20">
+      <div className="border-b-4 border-black pb-8 transform -rotate-1">
+        <h2 className="text-5xl font-comic text-white stroke-black-bold drop-shadow-[4px_4px_0px_#000] uppercase tracking-wider">INTEL</h2>
+        <div className="bg-yellow-400 text-black px-3 py-1 inline-block text-[10px] font-black uppercase mt-2 tracking-widest border-2 border-black">DEEP MULTIMODAL ANALYSIS</div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
         <div className="space-y-6">
-          <div className="p-6 bg-zinc-900/50 border border-zinc-800 rounded-3xl space-y-6">
+          <div className="bg-white border-[6px] border-black p-8 shadow-[12px_12px_0px_0px_#000] space-y-8 text-black relative">
+            <div className="absolute inset-0 comic-hatch opacity-5 pointer-events-none"></div>
             <div 
               onClick={() => fileInputRef.current?.click()}
-              className="w-full aspect-video border-2 border-dashed border-zinc-700 hover:border-indigo-500 bg-zinc-900 rounded-2xl flex flex-col items-center justify-center cursor-pointer transition-all overflow-hidden"
+              className="w-full aspect-video border-4 border-dashed border-zinc-200 bg-zinc-50 hover:border-black flex flex-col items-center justify-center cursor-pointer transition-all overflow-hidden relative"
             >
               <input type="file" ref={fileInputRef} hidden accept="image/*,video/*" onChange={handleFileChange} />
               {file ? (
@@ -57,48 +58,49 @@ export const IntelligenceStudio: React.FC = () => {
                   <video src={file.data} className="w-full h-full object-contain" />
                 )
               ) : (
-                <>
-                  <p className="text-[10px] text-zinc-500 font-black uppercase tracking-widest">UPLOAD MEDIA</p>
-                </>
+                <div className="text-center">
+                  <span className="text-4xl block mb-2">📤</span>
+                  <p className="text-[10px] text-zinc-400 font-black uppercase tracking-widest">UPLOAD MEDIA</p>
+                </div>
               )}
             </div>
 
             <div>
-              <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-3">Analysis Prompt</label>
+              <label className="block text-[11px] font-black text-zinc-400 uppercase tracking-widest mb-3 ml-1">ANALYSIS SCRIPT</label>
               <textarea
                 value={prompt}
                 onChange={(e) => setPrompt(e.target.value)}
-                className="w-full h-24 bg-zinc-800 border-none rounded-xl p-4 text-zinc-100 focus:ring-2 focus:ring-indigo-500 transition-all resize-none text-xs uppercase font-bold"
+                className="w-full h-24 bg-zinc-50 border-4 border-black p-4 text-black font-black uppercase text-xs focus:border-cyan-400 outline-none resize-none"
               />
             </div>
 
             <button
               onClick={handleAnalyze}
               disabled={loading || !file}
-              className="w-full py-4 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white font-black uppercase tracking-widest rounded-xl transition-all shadow-xl"
+              className="w-full py-5 bg-cyan-400 border-4 border-black text-black font-comic text-3xl uppercase shadow-[8px_8px_0px_0px_#000] active:translate-x-1 active:translate-y-1 active:shadow-none transition-all"
             >
-              {loading ? "ANALYZING..." : "START INTELLIGENCE ENGINE"}
+              {loading ? "SCANNING..." : "SCAN INTEL!"}
             </button>
-            {error && <p className="text-red-400 text-xs">{error}</p>}
+            {error && <p className="text-red-600 text-[10px] font-black uppercase text-center">{error}</p>}
           </div>
         </div>
 
         <div className="space-y-6">
-          <div className="p-8 bg-zinc-900 border border-zinc-800 rounded-3xl min-h-[400px]">
-            <h3 className="text-[10px] font-black text-zinc-500 uppercase tracking-widest mb-6 border-b border-zinc-800 pb-4">Analysis Report</h3>
+          <div className="bg-white border-[6px] border-black p-10 shadow-[16px_16px_0px_0px_#000] min-h-[500px] text-black relative overflow-hidden">
+            <div className="absolute inset-0 comic-hatch opacity-5 pointer-events-none"></div>
+            <h3 className="text-3xl font-comic uppercase mb-6 border-b-4 border-black pb-4">INTELLIGENCE REPORT</h3>
             {loading ? (
-              <div className="flex flex-col items-center justify-center py-20 animate-pulse">
-                <div className="w-8 h-8 bg-indigo-500/20 rounded-full mb-4"></div>
-                <div className="h-4 w-48 bg-zinc-800 rounded-full mb-2"></div>
-                <div className="h-4 w-32 bg-zinc-800 rounded-full"></div>
+              <div className="flex flex-col items-center justify-center py-20">
+                <div className="text-6xl animate-bounce mb-4">🔍</div>
+                <p className="text-[10px] font-black uppercase text-zinc-400 animate-pulse">Processing Modal Stream...</p>
               </div>
             ) : response ? (
-              <div className="prose prose-invert max-w-none text-zinc-300 text-sm leading-relaxed whitespace-pre-wrap">
+              <div className="text-sm font-bold uppercase leading-relaxed whitespace-pre-wrap">
                 {response}
               </div>
             ) : (
-              <div className="text-center py-20 opacity-20">
-                <p className="text-[10px] font-black uppercase tracking-widest">Awaiting data input...</p>
+              <div className="text-center py-24 opacity-10">
+                <p className="text-7xl font-comic uppercase tracking-widest">NO DATA</p>
               </div>
             )}
           </div>

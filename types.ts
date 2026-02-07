@@ -1,5 +1,5 @@
 
-export type AppView = 'home' | 'poster' | 'comic' | 'video' | 'edit' | 'analyze' | 'live' | 'speech' | 'history' | 'distribution' | 'avatar' | 'stitcher' | 'book' | 'settings' | 'analytics' | 'privacy' | 'terms';
+export type AppView = 'home' | 'poster' | 'comic' | 'video' | 'video-editor' | 'edit' | 'analyze' | 'live' | 'speech' | 'history' | 'distribution' | 'avatar' | 'stitcher' | 'book' | 'settings' | 'analytics' | 'privacy' | 'terms';
 
 export type Alignment = 'hero' | 'villain';
 
@@ -101,6 +101,17 @@ export interface GeneratedContent {
   cloudSynced?: boolean;
 }
 
+export interface TrackItem {
+  id: string;
+  content: GeneratedContent;
+  startTime: number;
+  endTime: number;
+  duration: number;
+  playbackSpeed: number;
+  volume: number;
+  filter: string;
+}
+
 export enum AspectRatio {
   SQUARE = '1:1',
   PORTRAIT = '9:16',
@@ -127,7 +138,12 @@ export enum PosterStyle {
   PIXAR_NATURE = 'Pixar Nature (Lush, Realistic Environments)',
   HEROIC_3D = 'Heroic 3D (Animated, Vibrant, Detailed)',
   SUPERHERO_COMIC = 'Superhero Comic (Action, Explosive, Graphic)',
-  URBAN_CINEMATIC = 'Urban Cinematic (Gritty, Night City, Realism)'
+  URBAN_CINEMATIC = 'Urban Cinematic (Gritty, Night City, Realism)',
+  VINTAGE_NOIR = 'Vintage Noir (Black & White, High Contrast)',
+  ANIME_SENSATION = 'Anime Sensation (Sharp Lines, Dynamic Effects)',
+  GOLDEN_AGE_INK = 'Golden Age Ink (Classic Dot-Screen, Primary Colors)',
+  MODERN_VARIANT = 'Modern Variant (Painted Style, Abstract Backgrounds)',
+  CYBER_REVOLUTION = 'Cyber Revolution (Neon, Holographic, Tech-Grit)'
 }
 
 export enum ComicStyle {
