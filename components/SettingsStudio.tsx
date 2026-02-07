@@ -7,13 +7,24 @@ interface SettingsStudioProps {
   onUpdateSettings: (settings: UserSettings) => void;
   onLogout: () => void;
   onDeleteAccount: () => void;
+  onViewPrivacy?: () => void;
+  onViewTerms?: () => void;
 }
 
-const GOOGLE_CLIENT_ID = 1042356611430-qa2i8o4fgavdqu9ivvtq9i1qdlpomp5p.apps.googleusercontent.com
+const DEFAULT_CLIENT_ID = '1042356611430-qa2i8o4fgavdqu9ivvtq9i1qdlpomp5p.apps.googleusercontent.com';
 
-export const SettingsStudio: React.FC<SettingsStudioProps> = ({ user, onUpdateSettings, onLogout, onDeleteAccount }) => {
+export const SettingsStudio: React.FC<SettingsStudioProps> = ({ user, onUpdateSettings, onLogout, onDeleteAccount, onViewPrivacy, onViewTerms }) => {
   const [isAuthorizing, setIsAuthorizing] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
+
+  const getGoogleClientId = () => {
+    try {
+      if (typeof process !== 'undefined' && process.env?.GOOGLE_CLIENT_ID) {
+        return process.env.GOOGLE_CLIENT_ID;
+      }
+    } catch (e) {}
+    return DEFAULT_CLIENT_ID;
+  };
 
   const currentSettings: UserSettings = user.settings || {
     safeMode: true,
@@ -34,144 +45,139 @@ export const SettingsStudio: React.FC<SettingsStudioProps> = ({ user, onUpdateSe
     const google = (window as any).google;
     
     if (!google?.accounts?.oauth2) {
-      setAuthError("Google Identity services not ready.");
+      setAuthError("GOOGLE IDENTITY ENGINE NOT LOADED");
       setIsAuthorizing(false);
       return;
     }
 
-    // This triggers the OAuth2 Token flow for Drive scopes
-    const client = google.accounts.oauth2.initTokenClient({
-      client_id: GOOGLE_CLIENT_ID,
-      scope: 'https://www.googleapis.com/auth/drive.file',
-      callback: (response: any) => {
-        if (response.error) {
-          setAuthError(response.error_description || "Authorization failed.");
-        } else {
-          // Update the user with the new access token
-          onUpdateSettings({
-            ...currentSettings,
-            autoCloudSync: true
-          });
-          // Note: In App.tsx we should save the cloudAccessToken
-          // For now we'll trigger a dummy update to simulate state change
-          window.dispatchEvent(new CustomEvent('cloud-auth-success', { detail: response.access_token }));
-        }
-        setIsAuthorizing(false);
-      },
-    });
+    try {
+      const client = google.accounts.oauth2.initTokenClient({
+        client_id: getGoogleClientId(),
+        scope: 'https://www.googleapis.com/auth/drive.file',
+        callback: (response: any) => {
+          if (response.error) {
+            setAuthError(response.error_description || "AUTHORIZATION DENIED");
+          } else {
+            window.dispatchEvent(new CustomEvent('cloud-auth-success', { detail: response.access_token }));
+            onUpdateSettings({
+              ...currentSettings,
+              autoCloudSync: true
+            });
+          }
+          setIsAuthorizing(false);
+        },
+      });
 
-    client.requestAccessToken();
+      client.requestAccessToken({ prompt: 'consent' });
+    } catch (err) {
+      setAuthError("DRIVE SYNC INITIALIZATION FAILED");
+      setIsAuthorizing(false);
+    }
   };
 
   return (
-    <div className="space-y-10 pb-24">
-      <div className="border-b border-zinc-800 pb-8">
-        <h2 className="text-4xl font-bold mb-2 tracking-tight text-white font-cinematic uppercase tracking-widest">Production Settings</h2>
-        <p className="text-zinc-400">Manage your cinematic identity and mobile safety preferences.</p>
+    <div className="space-y-12 pb-24">
+      <div className="border-b-4 border-black pb-8 transform -rotate-1">
+        <h2 className="text-5xl font-comic text-white stroke-black-bold drop-shadow-[4px_4px_0px_#000] uppercase tracking-wider">STUDIO SETUP</h2>
+        <div className="bg-cyan-400 text-black px-3 py-1 inline-block text-[10px] font-black uppercase mt-2 tracking-widest border-2 border-black">COMMAND CENTER CONFIG</div>
       </div>
 
-      <div className="max-w-2xl mx-auto space-y-8">
-        <div className="bg-zinc-900 border border-zinc-800 rounded-[2.5rem] overflow-hidden shadow-2xl">
-          <div className="p-8 border-b border-zinc-800 bg-zinc-900/50">
-             <h3 className="text-sm font-bold uppercase tracking-widest text-zinc-500">Core Preferences</h3>
+      <div className="max-w-2xl mx-auto space-y-10">
+        <div className="bg-zinc-900 border-4 border-black shadow-[10px_10px_0px_0px_#000] halftone overflow-hidden">
+          <div className="p-6 border-b-4 border-black bg-zinc-800 flex items-center justify-between">
+             <h3 className="text-xl font-comic uppercase text-white">CLOUD ARCHIVING</h3>
+             <span className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">Google Drive Integration</span>
           </div>
-          <div className="divide-y divide-zinc-800">
-             <div className="p-8 flex items-center justify-between">
-                <div>
-                   <h4 className="text-sm font-bold text-white mb-1">Mobile Safe Mode</h4>
-                   <p className="text-xs text-zinc-500">Strict PG filtering for all AI-generated content (Recommended for App Store).</p>
+          
+          <div className="divide-y-2 divide-black">
+             <div className="p-8 flex items-center justify-between group">
+                <div className="max-w-xs">
+                   <h4 className="text-sm font-black text-white uppercase mb-1">AUTOMATIC BACKUP</h4>
+                   <p className="text-[10px] text-zinc-500 uppercase font-bold leading-tight">Sync every production asset to your secure Google Drive folder instantly.</p>
                 </div>
                 <button 
-                  onClick={() => toggleSetting('safeMode')}
-                  className={`w-12 h-6 rounded-full transition-all relative ${currentSettings.safeMode ? 'bg-indigo-600' : 'bg-zinc-800'}`}
+                  onClick={() => toggleSetting('autoCloudSync')}
+                  className={`w-14 h-7 border-3 border-black rounded-full transition-all relative ${currentSettings.autoCloudSync ? 'bg-cyan-400' : 'bg-zinc-800'}`}
                 >
-                  <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${currentSettings.safeMode ? 'left-7' : 'left-1'}`}></div>
+                  <div className={`absolute top-0.5 w-4 h-4 bg-black border-2 border-black rounded-full transition-all ${currentSettings.autoCloudSync ? 'left-8 rotate-180' : 'left-1'}`}></div>
                 </button>
-             </div>
-             <div className="p-8 flex items-center justify-between">
-                <div>
-                   <h4 className="text-sm font-bold text-white mb-1">High-Fidelity Rendering</h4>
-                   <p className="text-xs text-zinc-500">Always generate content in 2K/4K resolution by default.</p>
-                </div>
-                <button 
-                  onClick={() => toggleSetting('hdByDefault')}
-                  className={`w-12 h-6 rounded-full transition-all relative ${currentSettings.hdByDefault ? 'bg-indigo-600' : 'bg-zinc-800'}`}
-                >
-                  <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${currentSettings.hdByDefault ? 'left-7' : 'left-1'}`}></div>
-                </button>
-             </div>
-             <div className="p-8 flex items-center justify-between">
-                <div>
-                   <h4 className="text-sm font-bold text-white mb-1">Cloud Archiving</h4>
-                   <p className="text-xs text-zinc-500">Automatically back up every production to Google Drive/iCloud.</p>
-                </div>
-                <div className="flex flex-col items-end gap-2">
-                  <button 
-                    disabled={user.cloudProvider === 'google' && !user.cloudAccessToken && !currentSettings.autoCloudSync}
-                    onClick={() => toggleSetting('autoCloudSync')}
-                    className={`w-12 h-6 rounded-full transition-all relative ${currentSettings.autoCloudSync ? 'bg-indigo-600' : 'bg-zinc-800'}`}
-                  >
-                    <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${currentSettings.autoCloudSync ? 'left-7' : 'left-1'}`}></div>
-                  </button>
-                </div>
              </div>
              
              {user.cloudProvider === 'google' && (
-               <div className="p-8 bg-indigo-900/10">
-                  <div className="flex items-center justify-between mb-4">
+               <div className={`p-8 transition-colors ${user.cloudAccessToken ? 'bg-green-500/5' : 'bg-red-500/5'}`}>
+                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
                      <div>
-                        <h4 className="text-sm font-bold text-indigo-400 mb-1">Authorize Google Drive</h4>
-                        <p className="text-[10px] text-zinc-500 uppercase font-bold tracking-widest">Required for Auto-Sync to function.</p>
+                        <h4 className="text-sm font-black text-white uppercase mb-1">AUTHORIZATION KEY</h4>
+                        <div className="flex items-center gap-2">
+                           <div className={`w-2 h-2 rounded-full ${user.cloudAccessToken ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`}></div>
+                           <p className="text-[10px] font-black uppercase tracking-widest text-zinc-400">
+                             {user.cloudAccessToken ? 'LINK ESTABLISHED' : 'LINK SEVERED'}
+                           </p>
+                        </div>
                      </div>
                      <button 
                         onClick={handleAuthorizeDrive}
                         disabled={isAuthorizing}
-                        className={`px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-[10px] font-black uppercase rounded-xl transition-all shadow-lg ${isAuthorizing ? 'animate-pulse' : ''}`}
+                        className={`px-8 py-3 bg-white text-black text-[10px] font-black uppercase border-3 border-black shadow-[4px_4px_0px_0px_#000] hover:shadow-none hover:translate-x-1 hover:translate-y-1 transition-all ${isAuthorizing ? 'animate-pulse' : ''}`}
                      >
-                        {isAuthorizing ? 'AUTHORIZING...' : user.cloudAccessToken ? 'RE-AUTHORIZE' : 'GRANT PERMISSION'}
+                        {isAuthorizing ? 'WAIT...' : user.cloudAccessToken ? 'REFRESH PERMISSIONS' : 'GRANT DRIVE ACCESS'}
                      </button>
                   </div>
-                  {authError && <p className="text-red-400 text-[10px] font-bold uppercase">{authError}</p>}
+                  {authError && <p className="text-red-500 text-[10px] font-black uppercase mt-4 text-center">{authError}</p>}
                </div>
              )}
           </div>
         </div>
 
-        <div className="bg-zinc-900 border border-zinc-800 rounded-[2.5rem] overflow-hidden shadow-2xl">
-          <div className="p-8 border-b border-zinc-800 bg-zinc-900/50">
-             <h3 className="text-sm font-bold uppercase tracking-widest text-zinc-500">Account Management</h3>
-          </div>
-          <div className="p-8 space-y-4">
-             <div className="flex items-center gap-4 p-4 bg-zinc-950 rounded-2xl border border-zinc-800">
-                <div className="w-12 h-12 bg-indigo-600/20 rounded-xl flex items-center justify-center border border-indigo-500/20 overflow-hidden">
+        <div className="bg-zinc-900 border-4 border-black shadow-[10px_10px_0px_0px_#000] halftone">
+          <div className="p-8">
+             <div className="flex items-center gap-6 p-6 bg-zinc-950 border-4 border-black mb-8 relative">
+                <div className="w-16 h-16 border-4 border-black bg-zinc-800 overflow-hidden shadow-[4px_4px_0px_0px_#000]">
                    <img src={user.avatarUrl || 'https://cdn-icons-png.flaticon.com/512/3011/3011270.png'} className="w-full h-full object-cover" />
                 </div>
                 <div>
-                   <p className="text-sm font-bold text-white">{user.username}</p>
-                   <p className="text-[10px] text-zinc-500 uppercase font-bold">{user.email || 'Director Level Account'}</p>
+                   <p className="text-xs font-black text-cyan-400 uppercase tracking-widest mb-1">ACTIVE DIRECTOR</p>
+                   <p className="text-2xl font-comic text-white uppercase leading-none">{user.username}</p>
+                   <p className="text-[10px] text-zinc-600 uppercase font-bold mt-1">{user.email || 'ANALOG SESSION'}</p>
                 </div>
+                <div className="absolute top-4 right-4 text-xs font-black text-zinc-800 select-none">ID: {user.id.substring(0,8).toUpperCase()}</div>
              </div>
-
+             
              <div className="grid grid-cols-2 gap-4">
                 <button 
-                  onClick={onLogout}
-                  className="w-full py-4 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 font-bold rounded-2xl transition-all flex items-center justify-center gap-2"
+                  onClick={onLogout} 
+                  className="py-4 bg-zinc-800 border-3 border-black text-zinc-400 font-black text-[10px] uppercase tracking-widest hover:bg-zinc-700 hover:text-white transition-all shadow-[4px_4px_0px_0px_#000] hover:shadow-none"
                 >
-                  🚪 Sign Out
+                  ABANDON POST
                 </button>
                 <button 
-                  onClick={() => { if(confirm('Delete all data permanently?')) onDeleteAccount(); }}
-                  className="w-full py-4 bg-red-900/20 hover:bg-red-900/40 text-red-500 font-bold rounded-2xl border border-red-900/20 transition-all flex items-center justify-center gap-2"
+                  onClick={() => { if(confirm('SURE? THIS WIPES THE ARCHIVE!')) onDeleteAccount(); }} 
+                  className="py-4 bg-red-600/10 border-3 border-black text-red-500 font-black text-[10px] uppercase tracking-widest hover:bg-red-600 hover:text-white transition-all shadow-[4px_4px_0px_0px_#000] hover:shadow-none"
                 >
-                  🗑️ Purge Data
+                  PURGE DOSSIER
                 </button>
              </div>
           </div>
         </div>
 
-        <div className="text-center">
-           <p className="text-[10px] text-zinc-600 font-bold uppercase tracking-[0.3em]">The Secret Life Of Your Pet v3.4.0 • Mobile-Optimized Engine</p>
-           <a href="#" className="text-[9px] text-indigo-500 hover:underline mt-2 inline-block font-bold">Privacy Policy & Terms</a>
+        <div className="text-center space-y-4">
+           <div className="flex justify-center gap-8">
+             <button 
+               onClick={onViewPrivacy}
+               className="text-[10px] text-cyan-400 hover:text-white font-black uppercase tracking-widest underline decoration-2 underline-offset-4"
+             >
+               Privacy Protocol
+             </button>
+             <button 
+               onClick={onViewTerms}
+               className="text-[10px] text-cyan-400 hover:text-white font-black uppercase tracking-widest underline decoration-2 underline-offset-4"
+             >
+               Service Terms
+             </button>
+           </div>
+           <p className="text-[9px] text-zinc-700 font-bold uppercase tracking-[0.5em]">
+             THE SECRET LIFE ENGINE v3.4.0 • BUILT FOR HEROES
+           </p>
         </div>
       </div>
     </div>

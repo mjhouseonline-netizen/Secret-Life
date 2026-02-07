@@ -7,10 +7,19 @@ export const DistributionStudio: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [metadata, setMetadata] = useState<{title: string, subtitle: string, description: string} | null>(null);
 
+  const getApiKey = () => {
+    try {
+      if (typeof process !== 'undefined' && process.env && process.env.API_KEY && process.env.API_KEY !== 'undefined') {
+        return process.env.API_KEY;
+      }
+    } catch (e) {}
+    return '';
+  };
+
   const generateStoreMetadata = async () => {
     setLoading(true);
     try {
-      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+      const ai = new GoogleGenAI({ apiKey: getApiKey() });
       const prompt = `Generate high-converting App Store metadata for an app called 'The Secret Life Of Your Pet'. 
       The app allows users to create cinematic posters, 4-panel comic strips, and AI-powered videos of their pets and friends.
       Generate metadata for the ${store === 'apple' ? 'iOS App Store' : 'Google Play Store'}.
@@ -42,7 +51,8 @@ export const DistributionStudio: React.FC = () => {
   const checklist = [
     { label: "App Manifest Configured", status: true },
     { label: "High-Res App Icons (1024x1024)", status: false },
-    { label: "Privacy Policy (Mobile Required)", status: false },
+    { label: "Privacy Policy (Mobile Required)", status: true },
+    { label: "Terms of Service", status: true },
     { label: "Age Rating (4+ Recommended)", status: false },
     { label: "Mobile Safe Mode Enabled", status: true },
   ];

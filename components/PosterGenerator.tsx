@@ -10,111 +10,75 @@ interface PosterGeneratorProps {
 }
 
 const OUTFIT_CATEGORIES = {
-  'SCI-FI & TECH': [
+  'SCI-FI & SPACE': [
     'Cybernetic Power Suit',
     'Spaceship Pilot Gear',
-    'High-Tech Tactical Vest',
+    'Mecha-Pilot Exoskeleton',
+    'Android Skin Plating',
     'Neon Samurai Plates',
-    'Clockwork Exoskeleton',
-    'Supernova Hazard Suit',
-    'Scrap-Yard Mech Armor',
-    'Quantum Phase Jumpsuit',
-    'Ion-Core Heavy Plating',
-    'Saturn-Ring Orbit Gears',
-    'Plasma Shield Rig',
-    'Nanotech Stealth Skin'
+    'Void Walker Environmental Suit'
   ],
   'FANTASY & MAGIC': [
     'Medieval Knight Armor',
     'Golden Cape & Crest',
-    'Tattered Ronin Robes',
     'Obsidian Dark-Lord Armor',
-    'Druidic Vine Wraps',
-    'Celestial Guardian Robes',
-    'Frost-Giant Hide Armor',
-    'Elderwood Shaman Robes',
-    'Dragon-Scale Mail',
-    'Ethereal Ghost-Armor',
-    'Phoenix Feather Cloak',
-    'Runelord Plate'
+    'Arcane Wizard Robes',
+    'Draconic Scale Mail',
+    'Elven Forest Tracker Leathers'
   ],
-  'MYTHOLOGICAL & LEGENDARY': [
-    'Mjolnir-Powered Gauntlets',
-    'Aegis Reflective Shield-Vest',
-    'Monkey King Silk Robes',
-    'Thunder God Bracers',
-    'Valkyrie Winged Armor',
-    'Anubis Death-Guard Wrap',
-    'Poseidon Trident Harness',
-    'Oni Demon Mask & Armor'
+  'HISTORICAL': [
+    'Victorian Steampunk Gear',
+    'Roman Centurion Armor',
+    'Samurai Battle Plates',
+    'Viking Berserker Furs',
+    'Wild West Gunslinger Duster',
+    'Pirate Captain Regalia'
   ],
-  'ELEMENTAL & NATURE': [
-    'Bioluminescent Scuba Rig',
-    'Living Leaf Plate',
-    'Volcanic Magma Shards',
-    'Ice-Crystal Carapace',
-    'Desert Nomad Wraps',
-    'Storm-Cloud Mantle',
-    'Solar-Flare Regalia',
-    'Abyssal Deep-Sea Shell'
+  'MODERN HERO': [
+    'Urban Vigilante Trench',
+    'High-Tech Tactical Vest',
+    'Special Ops Stealth Suit',
+    'Street-Ninja Techwear',
+    'Classic Spandex Hero Suit',
+    'Corporate Mech-Enforcer'
   ],
-  'HISTORICAL & NOBLE': [
-    'Victorian Noble Attire',
-    'Royal Guard Uniform',
-    'Viking Fur & Bone',
-    'Gladiator Sand-Plate',
-    'Samurai O-Yoroi',
-    'Aztec Jaguar Warrior Hide',
-    'Napoleonic Guard Uniform',
-    'Spartan Bronze Cuirass',
-    'Mongolian Steppe Armor'
-  ],
-  'MODERN & TACTICAL': [
-    'K-9 Special Ops Harness',
-    'Urban Ninja Sweats',
-    'High-Vis Construction Mech',
-    'Street-Brawler Hoodie & Wraps',
-    'Parkour Speed-Suit',
-    'Underground Agent Trenchcoat',
-    'Riot Control Exo-Shell'
-  ],
-  'WHIMSICAL & SURREAL': [
-    'Bubble-Gum Power Armor',
-    'Cardboard Box Mech',
-    'Stealth Shadow Cloak',
-    'Neon Holographic Suit',
-    'Glow-in-the-Dark Skeleton Onesie',
-    'Candy-Cane Staff & Cape',
-    'Invisibility Pajamas',
-    'Marshmallow Defender Suit'
+  'MYTHIC & GODLY': [
+    'Olympian Golden Armor',
+    'Asgardian Battle Cloak',
+    'Egyptian Pharaoh Plates',
+    'Atlantian Coral Carapace',
+    'Celestial Star-Silk Robes',
+    'Infernal Demon-King Shroud'
   ]
 };
 
 const OUTFIT_OPTIONS = Object.values(OUTFIT_CATEGORIES).flat();
 
+const DEFAULT_MEMBER: CastMember = {
+  id: '1',
+  name: '',
+  species: '',
+  gender: 'male',
+  traits: '',
+  weakness: '',
+  alias: '',
+  outfit: OUTFIT_OPTIONS[0],
+  referenceImages: [],
+  motivation: '',
+  origin: '',
+  targetWeakness: ''
+};
+
 export const PosterGenerator: React.FC<PosterGeneratorProps> = ({ onGenerated, initialData, onClearDraft }) => {
   const [step, setStep] = useState(1);
   const [alignment, setAlignment] = useState<Alignment>('hero');
-  const [cast, setCast] = useState<CastMember[]>([{
-    id: '1',
-    name: '',
-    species: '',
-    gender: 'male',
-    traits: '',
-    weakness: '',
-    alias: '',
-    outfit: OUTFIT_OPTIONS[0],
-    referenceImages: [],
-    motivation: '',
-    origin: '',
-    targetWeakness: ''
-  }]);
+  const [cast, setCast] = useState<CastMember[]>([DEFAULT_MEMBER]);
   const [activeMemberIdx, setActiveMemberIdx] = useState(0);
-  
   const [scenario, setScenario] = useState('');
   const [selectedStyle, setSelectedStyle] = useState<PosterStyle>(PosterStyle.EPIC_LEGEND);
   const [aspectRatio, setAspectRatio] = useState<AspectRatio>(AspectRatio.PORTRAIT);
   const [imageSize, setImageSize] = useState<ImageSize>(ImageSize.K1);
+  
   const [loading, setLoading] = useState(false);
   const [generatingScenario, setGeneratingScenario] = useState(false);
   const [generatingName, setGeneratingName] = useState(false);
@@ -122,8 +86,102 @@ export const PosterGenerator: React.FC<PosterGeneratorProps> = ({ onGenerated, i
   const [error, setError] = useState<string | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   
+  // Blueprint/Template State
+  const [showBlueprints, setShowBlueprints] = useState(false);
+  const [blueprints, setBlueprints] = useState<PosterTemplate[]>([]);
+  const [blueprintName, setBlueprintName] = useState('');
+
   const fileInputRef = useRef<HTMLInputElement>(null);
   const activeMember = cast[activeMemberIdx];
+
+  // 1. INITIAL LOAD & PERSISTENCE
+  useEffect(() => {
+    // Load Templates
+    const savedTemplates = localStorage.getItem('cinepet_poster_templates');
+    if (savedTemplates) {
+      try { setBlueprints(JSON.parse(savedTemplates)); } catch (e) { console.error(e); }
+    }
+
+    // Load current Draft if no initialData
+    if (initialData) {
+      applyTemplate(initialData);
+    } else {
+      const savedDraft = localStorage.getItem('cinepet_current_poster_draft');
+      if (savedDraft) {
+        try {
+          const draft = JSON.parse(savedDraft);
+          applyTemplate(draft);
+        } catch (e) { console.error(e); }
+      }
+    }
+  }, [initialData]);
+
+  // 2. AUTO-SAVE DRAFT
+  useEffect(() => {
+    const draft: Partial<PosterTemplate> = {
+      alignment,
+      cast,
+      scenario,
+      style: selectedStyle,
+      aspectRatio,
+      imageSize,
+      timestamp: Date.now()
+    };
+    localStorage.setItem('cinepet_current_poster_draft', JSON.stringify(draft));
+  }, [alignment, cast, scenario, selectedStyle, aspectRatio, imageSize]);
+
+  const applyTemplate = (template: Partial<PosterTemplate>) => {
+    if (template.alignment) setAlignment(template.alignment);
+    if (template.cast) setCast(template.cast);
+    if (template.scenario) setScenario(template.scenario || '');
+    if (template.style) setSelectedStyle(template.style);
+    if (template.aspectRatio) setAspectRatio(template.aspectRatio);
+    if (template.imageSize) setImageSize(template.imageSize);
+    setStep(1);
+    setActiveMemberIdx(0);
+  };
+
+  const handleSaveBlueprint = () => {
+    if (!blueprintName.trim()) return;
+    const newTemplate: PosterTemplate = {
+      id: Math.random().toString(36).substr(2, 9),
+      name: blueprintName,
+      alignment,
+      cast,
+      scenario,
+      style: selectedStyle,
+      aspectRatio,
+      imageSize,
+      timestamp: Date.now()
+    };
+    const updated = [newTemplate, ...blueprints];
+    setBlueprints(updated);
+    localStorage.setItem('cinepet_poster_templates', JSON.stringify(updated));
+    setBlueprintName('');
+    alert("BLUEPRINT SECURED IN VAULT!");
+  };
+
+  const handleDeleteBlueprint = (id: string) => {
+    const updated = blueprints.filter(b => b.id !== id);
+    setBlueprints(updated);
+    localStorage.setItem('cinepet_poster_templates', JSON.stringify(updated));
+  };
+
+  const handleScrapDraft = () => {
+    if (confirm("SCRAP THIS DRAFT? STARTING FROM SCRATCH?")) {
+      setAlignment('hero');
+      setCast([{ ...DEFAULT_MEMBER, id: Math.random().toString(36).substr(2, 5) }]);
+      setScenario('');
+      setSelectedStyle(PosterStyle.EPIC_LEGEND);
+      setAspectRatio(AspectRatio.PORTRAIT);
+      setImageSize(ImageSize.K1);
+      setStep(1);
+      setActiveMemberIdx(0);
+      setPreviewUrl(null);
+      localStorage.removeItem('cinepet_current_poster_draft');
+      if (onClearDraft) onClearDraft();
+    }
+  };
 
   const updateMember = (updates: Partial<CastMember>) => {
     setCast(prev => prev.map((m, i) => i === activeMemberIdx ? { ...m, ...updates } : m));
@@ -199,7 +257,7 @@ export const PosterGenerator: React.FC<PosterGeneratorProps> = ({ onGenerated, i
   };
 
   return (
-    <div className="space-y-10 pb-20 text-white">
+    <div className="space-y-10 pb-20 text-white relative">
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
         <div className="transform -rotate-1">
           <h2 className="text-5xl font-comic text-white stroke-black-bold drop-shadow-[4px_4px_0px_#000] uppercase leading-none">
@@ -219,14 +277,27 @@ export const PosterGenerator: React.FC<PosterGeneratorProps> = ({ onGenerated, i
               className={`px-6 py-2 font-comic text-lg uppercase transition-all ${alignment === 'villain' ? 'bg-magenta-500 text-white' : 'text-zinc-500 hover:text-white'}`}
             >VILLAIN</button>
           </div>
+          <button 
+            onClick={() => setShowBlueprints(true)}
+            className="bg-yellow-400 border-3 border-black p-3 shadow-[4px_4px_0px_0px_#000] flex items-center gap-2 hover:bg-yellow-300 transition-all"
+          >
+            <span className="text-black font-black text-xs uppercase">Blueprints</span>
+          </button>
         </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-        {/* Left Column: Comic Panel Form */}
         <div className="lg:col-span-5">
-           <div className="bg-zinc-900 border-4 border-black p-8 shadow-[8px_8px_0px_0px_#000] halftone min-h-[600px] flex flex-col justify-between">
+           <div className="bg-zinc-900 border-4 border-black p-8 shadow-[8px_8px_0px_0px_#000] halftone min-h-[600px] flex flex-col justify-between relative">
               
+              {/* Reset/Scrap Control */}
+              <button 
+                onClick={handleScrapDraft}
+                className="absolute -top-3 -right-3 bg-red-600 text-white border-3 border-black p-2 font-black text-[8px] uppercase hover:bg-red-500 transition-all shadow-[4px_4px_0px_#000] z-20"
+              >
+                SCRAP DRAFT
+              </button>
+
               {step === 1 && (
                 <div className="space-y-6 animate-in fade-in zoom-in-95 duration-200">
                   <div className="border-b-4 border-black pb-4 mb-4">
@@ -240,7 +311,7 @@ export const PosterGenerator: React.FC<PosterGeneratorProps> = ({ onGenerated, i
                           type="text" 
                           value={activeMember.name}
                           onChange={(e) => updateMember({ name: e.target.value })}
-                          className="w-full bg-zinc-800 border-3 border-black p-4 text-white font-bold focus:border-cyan-400 outline-none"
+                          className="w-full bg-zinc-800 border-3 border-black p-4 text-white font-bold focus:border-cyan-400 outline-none uppercase"
                           placeholder="What do they go by?"
                        />
                     </div>
@@ -250,25 +321,11 @@ export const PosterGenerator: React.FC<PosterGeneratorProps> = ({ onGenerated, i
                           type="text" 
                           value={activeMember.species}
                           onChange={(e) => updateMember({ species: e.target.value })}
-                          className="w-full bg-zinc-800 border-3 border-black p-4 text-white font-bold focus:border-cyan-400 outline-none"
+                          className="w-full bg-zinc-800 border-3 border-black p-4 text-white font-bold focus:border-cyan-400 outline-none uppercase"
                           placeholder="e.g. Alien Dog, Robot Human"
                        />
                     </div>
 
-                    <div className="space-y-2">
-                       <label className="text-[10px] font-black uppercase tracking-widest text-zinc-500">GENDER</label>
-                       <div className="flex bg-zinc-800 border-3 border-black p-1">
-                          <button 
-                            onClick={() => updateMember({ gender: 'male' })}
-                            className={`flex-1 py-2 font-comic text-lg uppercase transition-all ${activeMember.gender === 'male' ? 'bg-cyan-400 text-black' : 'text-zinc-600'}`}
-                          >MALE</button>
-                          <button 
-                            onClick={() => updateMember({ gender: 'female' })}
-                            className={`flex-1 py-2 font-comic text-lg uppercase transition-all ${activeMember.gender === 'female' ? 'bg-cyan-400 text-black' : 'text-zinc-600'}`}
-                          >FEMALE</button>
-                       </div>
-                    </div>
-                    
                     <div className="space-y-2">
                        <label className="text-[10px] font-black uppercase tracking-widest text-zinc-500">VISUAL DNA (1-3 PHOTOS)</label>
                        <div className="flex gap-2">
@@ -323,14 +380,10 @@ export const PosterGenerator: React.FC<PosterGeneratorProps> = ({ onGenerated, i
                             type="text" 
                             value={activeMember.alias}
                             onChange={(e) => updateMember({ alias: e.target.value })}
-                            className="w-full bg-zinc-800 border-3 border-black p-4 text-white font-bold focus:border-cyan-400 outline-none pr-12"
+                            className="w-full bg-zinc-800 border-3 border-black p-4 text-white font-bold focus:border-cyan-400 outline-none pr-12 uppercase"
                             placeholder="e.g. THE GOLDEN BARK"
                           />
-                          <button 
-                            onClick={handleGenerateName}
-                            disabled={generatingName}
-                            className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-black hover:scale-110 transition-transform uppercase text-cyan-400"
-                          >
+                          <button onClick={handleGenerateName} disabled={generatingName} className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-black hover:scale-110 transition-transform uppercase text-cyan-400">
                             {generatingName ? 'WAIT' : 'MAGIC'}
                           </button>
                        </div>
@@ -338,43 +391,35 @@ export const PosterGenerator: React.FC<PosterGeneratorProps> = ({ onGenerated, i
 
                     <div className="space-y-2">
                        <label className="text-[10px] font-black uppercase tracking-widest text-zinc-500">BATTLE GEAR</label>
-                       <div className="relative">
-                         <input 
-                            type="text" 
+                       <div className="relative flex flex-col gap-2">
+                         <select 
                             value={activeMember.outfit}
                             onChange={(e) => updateMember({ outfit: e.target.value })}
-                            className="w-full bg-zinc-800 border-3 border-black p-4 text-white font-bold focus:border-cyan-400 outline-none pr-12"
-                            placeholder="Describe or select gear..."
-                          />
-                          <button 
-                            onClick={handleGenerateOutfit}
-                            disabled={generatingOutfit}
-                            className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-black hover:scale-110 transition-transform uppercase text-magenta-400"
-                          >
-                            {generatingOutfit ? 'WAIT' : 'DESIGN'}
-                          </button>
+                            className="w-full bg-zinc-800 border-3 border-black p-4 text-white font-bold focus:border-cyan-400 outline-none uppercase appearance-none"
+                         >
+                           {Object.entries(OUTFIT_CATEGORIES).map(([cat, options]) => (
+                             <optgroup key={cat} label={cat} className="bg-zinc-900 text-zinc-400">
+                               {options.map(opt => <option key={opt} value={opt} className="text-white">{opt}</option>)}
+                             </optgroup>
+                           ))}
+                           <option value="CUSTOM">--- CUSTOM DESCRIPTION ---</option>
+                         </select>
+                         
+                         {activeMember.outfit === 'CUSTOM' || !OUTFIT_OPTIONS.includes(activeMember.outfit) ? (
+                            <div className="relative">
+                               <input 
+                                  type="text" 
+                                  value={activeMember.outfit === 'CUSTOM' ? '' : activeMember.outfit}
+                                  onChange={(e) => updateMember({ outfit: e.target.value })}
+                                  className="w-full bg-zinc-800 border-3 border-black p-4 text-white font-bold focus:border-cyan-400 outline-none pr-12 uppercase"
+                                  placeholder="Describe custom gear..."
+                                />
+                                <button onClick={handleGenerateOutfit} disabled={generatingOutfit} className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-black hover:scale-110 transition-transform uppercase text-magenta-400">
+                                  {generatingOutfit ? 'WAIT' : 'DESIGN'}
+                                </button>
+                            </div>
+                         ) : null}
                        </div>
-                       <select 
-                        onChange={(e) => updateMember({ outfit: e.target.value })}
-                        className="w-full mt-2 bg-zinc-950 border-2 border-black p-2 text-[10px] text-zinc-500 font-bold uppercase outline-none"
-                       >
-                         <option value="">-- Quick Select Presets --</option>
-                         {Object.entries(OUTFIT_CATEGORIES).map(([category, options]) => (
-                           <optgroup key={category} label={category}>
-                             {options.map(o => <option key={o} value={o}>{o}</option>)}
-                           </optgroup>
-                         ))}
-                       </select>
-                    </div>
-
-                    <div className="space-y-2">
-                       <label className="text-[10px] font-black uppercase tracking-widest text-zinc-500">PERSONALITY & TRAITS</label>
-                       <textarea 
-                          value={activeMember.traits}
-                          onChange={(e) => updateMember({ traits: e.target.value })}
-                          className="w-full h-24 bg-zinc-800 border-3 border-black p-4 text-white font-bold focus:border-cyan-400 outline-none resize-none"
-                          placeholder="e.g. Always eats the last pizza slice, fears vacuum cleaners..."
-                       />
                     </div>
                   </div>
 
@@ -393,13 +438,13 @@ export const PosterGenerator: React.FC<PosterGeneratorProps> = ({ onGenerated, i
                     <div className="grid grid-cols-2 gap-4">
                        <div className="space-y-2">
                           <label className="text-[10px] font-black uppercase tracking-widest text-zinc-500">STYLE</label>
-                          <select value={selectedStyle} onChange={(e) => setSelectedStyle(e.target.value as PosterStyle)} className="w-full bg-zinc-800 border-3 border-black p-2 font-bold text-[10px] outline-none text-white appearance-none">
+                          <select value={selectedStyle} onChange={(e) => setSelectedStyle(e.target.value as PosterStyle)} className="w-full bg-zinc-800 border-3 border-black p-2 font-bold text-[10px] outline-none text-white appearance-none uppercase">
                             {Object.entries(PosterStyle).map(([k, v]) => <option key={v} value={v}>{k}</option>)}
                           </select>
                        </div>
                        <div className="space-y-2">
                           <label className="text-[10px] font-black uppercase tracking-widest text-zinc-500">FORMAT</label>
-                          <select value={aspectRatio} onChange={(e) => setAspectRatio(e.target.value as AspectRatio)} className="w-full bg-zinc-800 border-3 border-black p-2 font-bold text-[10px] outline-none text-white appearance-none">
+                          <select value={aspectRatio} onChange={(e) => setAspectRatio(e.target.value as AspectRatio)} className="w-full bg-zinc-800 border-3 border-black p-2 font-bold text-[10px] outline-none text-white appearance-none uppercase">
                             {Object.entries(AspectRatio).map(([k, v]) => <option key={v} value={v}>{v}</option>)}
                           </select>
                        </div>
@@ -408,73 +453,108 @@ export const PosterGenerator: React.FC<PosterGeneratorProps> = ({ onGenerated, i
                     <div className="space-y-2">
                        <div className="flex justify-between items-center">
                          <label className="text-[10px] font-black uppercase tracking-widest text-zinc-500">SCENE DESCRIPTION</label>
-                         <button 
-                           onClick={handleGenerateScenario}
-                           disabled={generatingScenario}
-                           className="text-[10px] font-black uppercase text-yellow-400 hover:underline transition-all"
-                         >
-                           {generatingScenario ? 'SCRIPTING...' : 'AI SCRIPTWRITER'}
+                         <button onClick={handleGenerateScenario} disabled={generatingScenario} className="text-[10px] font-black uppercase text-yellow-400 hover:underline">
+                           {generatingScenario ? 'SCRIPTING...' : 'AI SCRIPT'}
                          </button>
                        </div>
-                       <textarea
-                        value={scenario}
-                        onChange={(e) => setScenario(e.target.value)}
-                        placeholder="Describe the action shot... e.g. An epic showdown on top of a futuristic skyscraper during a neon rainstorm."
-                        className="w-full h-32 bg-zinc-800 border-3 border-black p-4 text-white font-bold focus:border-cyan-400 outline-none resize-none"
-                       />
+                       <textarea value={scenario} onChange={(e) => setScenario(e.target.value)} className="w-full h-32 bg-zinc-800 border-3 border-black p-4 text-white font-bold focus:border-cyan-400 outline-none resize-none uppercase text-xs" />
                     </div>
                   </div>
 
                   <div className="flex gap-4">
                     <button onClick={() => setStep(2)} className="flex-1 py-4 border-3 border-black font-comic uppercase bg-zinc-800 text-zinc-400">BACK</button>
-                    <button 
-                      onClick={handleGenerate} 
-                      disabled={loading || !scenario}
-                      className="flex-[3] py-5 bg-yellow-400 border-4 border-black text-black font-comic text-4xl uppercase shadow-[10px_10px_0px_0px_#000] hover:shadow-[2px_2px_0px_0px_#000] hover:translate-x-2 hover:translate-y-2 transition-all flex items-center justify-center gap-4"
-                    >
-                      {loading ? (
-                        <>
-                          <div className="w-6 h-6 border-4 border-black border-t-transparent rounded-full animate-spin"></div>
-                          <span>INKING...</span>
-                        </>
-                      ) : (
-                        <span>WHAM! PRODUCE!</span>
-                      )}
+                    <button onClick={handleGenerate} disabled={loading || !scenario} className="flex-[3] py-5 bg-yellow-400 border-4 border-black text-black font-comic text-4xl uppercase shadow-[10px_10px_0px_0px_#000] transition-all">
+                      {loading ? 'INKING...' : 'WHAM! PRODUCE!'}
                     </button>
                   </div>
                 </div>
               )}
 
-              {error && <p className="text-red-500 text-center font-black uppercase text-xs mt-4 animate-pulse">{error}</p>}
+              {error && <p className="text-red-500 text-center font-black uppercase text-xs mt-4">{error}</p>}
            </div>
         </div>
 
-        {/* Right Column: Preview Panel */}
         <div className="lg:col-span-7">
            <div className="bg-zinc-900 border-4 border-black p-4 shadow-[12px_12px_0px_0px_#000] h-full flex items-center justify-center relative overflow-hidden halftone group">
             {previewUrl ? (
               <img src={previewUrl} className="w-full h-full object-contain border-4 border-black transition-transform duration-500 group-hover:scale-[1.02]" />
             ) : (
               <div className="text-center p-20 flex flex-col items-center">
-                <div className="w-32 h-32 border-8 border-zinc-800 rounded-full border-t-cyan-400 animate-spin mb-8"></div>
-                <h3 className="text-5xl font-comic uppercase text-white opacity-10 tracking-widest">THE SPLASH PAGE</h3>
-                <p className="text-[10px] font-black text-zinc-600 opacity-30 mt-4 tracking-widest">AWAITING CREATIVE INKING</p>
+                <img src="https://images.unsplash.com/photo-1579373903781-fd5c0c30c4cd?q=80&w=1000&auto=format&fit=crop" className="w-72 h-auto object-cover border-4 border-black grayscale opacity-10 mb-8 transform -rotate-1" />
+                <h3 className="text-6xl font-comic uppercase text-white opacity-20 tracking-widest">THE SPLASH PAGE</h3>
+                <p className="text-[12px] font-black text-zinc-700 opacity-40 mt-6 tracking-[0.5em] uppercase">Awaiting Draft Ink</p>
               </div>
             )}
             
             {loading && (
               <div className="absolute inset-0 bg-yellow-400 z-30 flex flex-col items-center justify-center p-12 text-center animate-in fade-in halftone">
-                 <h3 className="text-6xl font-comic text-black stroke-white drop-shadow-[4px_4px_0px_#fff] uppercase mb-4">INKING PANELS!</h3>
-                 <div className="max-w-md bg-white border-3 border-black p-4 shadow-[6px_6px_0px_0px_#000]">
-                    <p className="text-[10px] font-black text-black italic leading-relaxed uppercase">
-                      "GEMINI 3 PRO IS COORDINATING THE CINEMATIC VISUAL LAYERS. SYNTHESIZING UNIQUE CHARACTER PROFILES INTO A CONSISTENT ENVIRONMENT."
-                    </p>
-                 </div>
+                 <h3 className="text-6xl font-comic text-black stroke-white drop-shadow-[4px_4px_0px_#fff] uppercase mb-4 animate-bounce">INKING PANELS!</h3>
+                 <p className="font-black text-black text-xs tracking-widest uppercase">The production engine is synthesizing character DNA...</p>
               </div>
             )}
           </div>
         </div>
       </div>
+
+      {/* Blueprint Vault Modal */}
+      {showBlueprints && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-6">
+          <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={() => setShowBlueprints(false)}></div>
+          <div className="relative w-full max-w-2xl bg-zinc-900 border-4 border-black p-10 shadow-[15px_15px_0px_#000] halftone animate-in zoom-in-95 duration-200">
+            <h3 className="text-4xl font-comic text-white uppercase mb-8 border-b-4 border-black pb-4">BLUEPRINT VAULT</h3>
+            
+            <div className="space-y-6">
+              <div className="flex gap-4">
+                <input 
+                  type="text" 
+                  value={blueprintName}
+                  onChange={(e) => setBlueprintName(e.target.value)}
+                  placeholder="NEW BLUEPRINT NAME..."
+                  className="flex-1 bg-zinc-800 border-3 border-black p-4 text-white font-black uppercase text-xs focus:border-cyan-400 outline-none"
+                />
+                <button 
+                  onClick={handleSaveBlueprint}
+                  disabled={!blueprintName.trim()}
+                  className="px-8 py-4 bg-yellow-400 border-3 border-black text-black font-black uppercase text-xs shadow-[4px_4px_0px_#000] disabled:opacity-30"
+                >
+                  SAVE
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
+                {blueprints.length === 0 ? (
+                  <div className="col-span-full py-20 text-center opacity-30">
+                    <p className="text-xs font-black uppercase tracking-widest">Vault Empty</p>
+                  </div>
+                ) : (
+                  blueprints.map(bp => (
+                    <div key={bp.id} className="group bg-zinc-800 border-3 border-black p-4 relative hover:border-cyan-400 transition-all">
+                      <h4 className="font-black text-white uppercase text-sm mb-2 truncate pr-6">{bp.name}</h4>
+                      <p className="text-[8px] text-zinc-500 uppercase font-black">{bp.style} • {bp.cast.length} MEMBERS</p>
+                      
+                      <div className="mt-4 flex gap-2">
+                        <button 
+                          onClick={() => { applyTemplate(bp); setShowBlueprints(false); }}
+                          className="flex-1 py-1.5 bg-cyan-400 text-black font-black uppercase text-[8px] border-2 border-black"
+                        >LOAD</button>
+                        <button 
+                          onClick={() => handleDeleteBlueprint(bp.id)}
+                          className="px-2 py-1.5 bg-zinc-950 text-red-500 font-black uppercase text-[8px] border-2 border-black"
+                        >SCRAP</button>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+
+            <button 
+              onClick={() => setShowBlueprints(false)}
+              className="mt-10 w-full py-4 bg-zinc-800 text-zinc-500 font-black uppercase text-xs border-3 border-black"
+            >CLOSE VAULT</button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

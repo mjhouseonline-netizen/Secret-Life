@@ -18,6 +18,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeView, setActiveV
   const isAdmin = user.role === 'admin';
 
   const navItems = [
+    { id: 'home', label: 'DASHBOARD' },
     { id: 'poster', label: 'POSTERS' },
     { id: 'comic', label: 'COMICS' },
     { id: 'book', label: 'BOOKS' },
@@ -31,9 +32,9 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeView, setActiveV
   ];
 
   const mobileTabs = [
+    { id: 'home', label: 'HOME' },
     { id: 'poster', label: 'CREATE' },
     { id: 'video', label: 'ANIMATE' },
-    ...(isAdmin ? [{ id: 'analytics', label: 'INTEL' }] : [{ id: 'live', label: 'LIVE' }]),
     { id: 'history', label: 'LIBRARY' },
     { id: 'settings', label: 'YOU' },
   ];
@@ -42,7 +43,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeView, setActiveV
     <div className="flex h-screen bg-zinc-950 text-white overflow-hidden font-sans">
       {/* Desktop Sidebar - Comic Strip Style */}
       <aside className="w-64 border-r-4 border-black bg-zinc-900 flex flex-col hidden lg:flex">
-        <div className="p-6 bg-yellow-400 border-b-4 border-black halftone">
+        <div className="p-6 bg-yellow-400 border-b-4 border-black halftone cursor-pointer" onClick={() => setActiveView('home')}>
           <h1 className="text-4xl font-comic tracking-wider text-black transform -rotate-2 leading-none">SECRET LIFE!</h1>
           <p className="text-[10px] text-black mt-2 uppercase tracking-widest font-bold">Volume 1: The Dark Studio</p>
         </div>
@@ -81,7 +82,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeView, setActiveV
 
              <div className="flex items-center justify-between bg-zinc-950 p-2 border-2 border-black">
                 <div className="flex flex-col">
-                  <span className="text-[7px] font-black uppercase text-zinc-500">BUDGET</span>
+                  <span className="text-[7px] font-black uppercase text-zinc-500">MONTHLY QUOTA</span>
                   <span className="text-xs font-black text-cyan-400">
                     {isAdmin ? 'UNLIMITED' : user.credits}
                   </span>
@@ -109,7 +110,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeView, setActiveV
       <main className="flex-1 flex flex-col relative overflow-hidden">
         {/* Mobile Header */}
         <header className="lg:hidden flex items-center justify-between p-4 bg-zinc-900 border-b-4 border-black sticky top-0 z-50 halftone">
-          <h1 className="text-2xl font-comic tracking-wider text-white transform -rotate-1">SECRET LIFE!</h1>
+          <h1 className="text-2xl font-comic tracking-wider text-white transform -rotate-1 cursor-pointer" onClick={() => setActiveView('home')}>SECRET LIFE!</h1>
           <div className="flex items-center gap-3">
              <div className="px-3 py-1 bg-zinc-800 border-2 border-black text-[10px] font-black uppercase text-cyan-400 shadow-[2px_2px_0px_0px_#000]">
                {isAdmin ? 'INF' : user.credits}

@@ -1,223 +1,210 @@
 
-// DO NOT use or import GoogleGenerativeAI from "@google/genai"
-import { GoogleGenAI, Modality } from "@google/genai";
+import { GoogleGenAI, Modality, Type } from "@google/genai";
 import { AspectRatio, Resolution, ImageSize, VideoStyle, ComicStyle, PosterStyle, CharacterProfile, ComicMetadata, CastMember, Alignment, BookStyle, BookMetadata, StitchTransition, AnimationPreset } from "../types";
 
 export class GeminiService {
-  private static getAI() {
-    // ALWAYS use const ai = new GoogleGenAI({apiKey: process.env.API_KEY});
-    return new GoogleGenAI({ apiKey: process.env.API_KEY });
+  private static getApiKey(): string {
+    if (typeof process !== 'undefined' && process.env?.API_KEY) {
+      return process.env.API_KEY;
+    }
+    return '';
   }
 
-  /**
-   * App Store Safety Policy:
-   * Ensures all generated content is PG-rated, family-friendly, 
-   * and contains no prohibited imagery or themes.
-   */
+  private static getAI() {
+    const apiKey = this.getApiKey();
+    return new GoogleGenAI({ apiKey });
+  }
+
+  private static getStrictAnatomyPrompt() {
+    return `
+      --- STRICT ANATOMY GUARD ---
+      1. MAINTAIN NATURAL PROPORTIONS: Characters must keep their original natural anatomy.
+      2. NO BEEFING UP: Do NOT add human-like muscles to pets.
+      3. NO HUMAN FEATURES: Pets must NOT have human facial expressions or stand on two legs. 
+      4. NO EXTRA LIMBS: Ensure exactly the natural number of limbs.
+      5. PETS REMAIN PETS: Animals must remain visually recognizable.
+    `;
+  }
+
   private static getSafetyPrompt(isSafeMode: boolean = true) {
     if (!isSafeMode) return "";
-    return ` SAFETY ENFORCEMENT: All generated visuals and text MUST be family-friendly, PG-rated, and suitable for distribution on mobile app stores. Prohibit violence, blood, adult themes, or illegal substances. Maintain a creative, professional, and positive artistic tone.`;
+    return ` SAFETY ENFORCEMENT: All content MUST be family-friendly and PG-rated.${this.getStrictAnatomyPrompt()}`;
   }
 
   private static handleError(error: any) {
-    console.error("Gemini API Error Details:", error);
-    const message = (error.message || error.toString() || "").toLowerCase();
-
-    if (message.includes("400") || message.includes("invalid_argument")) {
-      return "Invalid request configuration. Your prompt may be too long or contain unsupported characters.";
-    }
-    if (message.includes("401") || message.includes("unauthenticated")) {
-       return "Authentication failed. Please verify your API key.";
-    }
-    if (message.includes("403") || message.includes("permission_denied")) {
-      return "Access denied. Please ensure your Google Cloud project has billing enabled.";
-    }
-    if (message.includes("404") || message.includes("not_found") || message.includes("requested entity was not found")) {
-      try {
-        (window as any).aistudio?.openSelectKey();
-      } catch (e) { console.warn("Key selector not available"); }
-      return "Model resource unavailable. We are prompting you to re-select your API key.";
-    }
-    if (message.includes("429") || message.includes("resource_exhausted")) {
-      return "Traffic limit reached. Please wait a moment and try again.";
-    }
-    if (message.includes("500") || message.includes("internal")) {
-      return "Google internal server error. Please try again later.";
-    }
-    if (message.includes("503") || message.includes("unavailable") || message.includes("overloaded")) {
-      return "AI Service is currently overloaded. Please try again in a few seconds.";
-    }
-    if (message.includes("safety") || message.includes("blocked")) {
-      return "Generation blocked by safety filters. Please modify your prompt to be more family-friendly.";
-    }
-    if (message.includes("fetch failed") || message.includes("network")) {
-      return "Network connection failed. Please check your internet.";
-    }
-
-    return "An unexpected error occurred during generation. Please try again.";
+    console.error("Gemini API Error:", error);
+    const msg = error?.message?.toLowerCase() || "";
+    if (msg.includes("429")) return "Studio busy. Please wait.";
+    if (msg.includes("safety") || msg.includes("blocked")) return "Action blocked by safety protocols.";
+    return "Studio production error. Please try again.";
   }
 
-  static async generateCharacterAlias(member: Partial<CastMember>, alignment: Alignment): Promise<string> {
+  /**
+   * Generates a character alias using gemini-3-flash-preview.
+   */
+  static async generateCharacterAlias(member: CastMember, alignment: Alignment): Promise<string> {
     try {
       const ai = this.getAI();
-      const isVillain = alignment === 'villain';
-      const prompt = `Generate a unique, cool, and cinematic ${isVillain ? 'VILLAIN' : 'superhero'} name for a ${member.species} named ${member.name}. Traits: ${member.traits}. Return only the name.${this.getSafetyPrompt()}`;
       const response = await ai.models.generateContent({
         model: 'gemini-3-flash-preview',
-        contents: [{ parts: [{ text: prompt }] }],
+        contents: `Generate a short, punchy comic book alias/codename for a ${alignment} ${member.species} named ${member.name}. Traits: ${member.traits}.`,
+        config: { systemInstruction: "Output ONLY the name. No punctuation." }
       });
-      return response.text?.trim() || (isVillain ? "The Shadow" : "The Guardian");
+      return response.text?.trim() || "THE UNKNOWN";
     } catch (err) { throw new Error(this.handleError(err)); }
   }
 
-  static async generateVillainLore(member: Partial<CastMember>, heroTrait: string): Promise<{ motivation: string; origin: string; targetWeakness: string }> {
+  /**
+   * Generates an outfit description using gemini-3-flash-preview.
+   */
+  static async generateOutfitDescription(member: CastMember, alignment: Alignment, style: PosterStyle): Promise<string> {
     try {
       const ai = this.getAI();
-      const prompt = `Generate villainous lore for a ${member.species} named ${member.name} (Alias: ${member.alias}). Opposes a hero with trait "${heroTrait}". Return JSON: {motivation, origin, targetWeakness}. Max 30 words each.${this.getSafetyPrompt()}`;
       const response = await ai.models.generateContent({
         model: 'gemini-3-flash-preview',
-        contents: [{ parts: [{ text: prompt }] }],
-        config: { responseMimeType: "application/json" }
+        contents: `Describe a detailed cinematic outfit/armor for a ${alignment} ${member.species} character in a ${style} style.`,
+        config: { systemInstruction: "One sentence max." }
       });
-      return JSON.parse(response.text || "{}");
-    } catch (err) { throw new Error(this.handleError(err)); }
-  }
-
-  static async generateOutfitDescription(member: Partial<CastMember>, alignment: Alignment, style: string): Promise<string> {
-    try {
-      const ai = this.getAI();
-      const prompt = `Generate a detailed cinematic outfit name for a ${alignment} ${member.species}. Personality: ${member.traits}. Movie Aesthetic: ${style}. Return max 12 words.${this.getSafetyPrompt()}`;
-      const response = await ai.models.generateContent({
-        model: 'gemini-3-flash-preview',
-        contents: [{ parts: [{ text: prompt }] }],
-      });
-      return response.text?.trim() || "Epic Gear";
+      return response.text?.trim() || "Standard battle gear.";
     } catch (err) { throw new Error(this.handleError(err)); }
   }
 
   static async generatePosterScenario(cast: CastMember[], alignment: Alignment): Promise<string> {
     try {
       const ai = this.getAI();
-      const names = cast.map(c => `${c.alias} (${c.species})`).join(', ');
-      const prompt = `Generate a blockbuster movie scene featuring: ${names}. They are animals in a cinematic story. High-stakes group shot. Max 60 words.${this.getSafetyPrompt()}`;
       const response = await ai.models.generateContent({
         model: 'gemini-3-flash-preview',
-        contents: [{ parts: [{ text: prompt }] }],
+        contents: `Write a one-sentence blockbuster scenario for: ${cast.map(c => c.name).join(', ')} (${alignment}).`,
+        config: { systemInstruction: this.getStrictAnatomyPrompt() }
       });
-      return response.text?.trim() || "An epic showdown.";
+      return response.text?.trim() || "An epic showdown begins.";
+    } catch (err) { throw new Error(this.handleError(err)); }
+  }
+
+  static async editImage(source: string, prompt: string): Promise<string> {
+    try {
+      const ai = this.getAI();
+      const response = await ai.models.generateContent({
+        model: 'gemini-2.5-flash-image',
+        contents: {
+          parts: [
+            { inlineData: { data: source.split(',')[1], mimeType: 'image/png' } },
+            { text: `${prompt} ${this.getSafetyPrompt()}` }
+          ]
+        }
+      });
+      const part = response.candidates?.[0]?.content?.parts.find(p => p.inlineData);
+      if (part?.inlineData?.data) return `data:image/png;base64,${part.inlineData.data}`;
+      throw new Error("Edit failed.");
+    } catch (err) { throw new Error(this.handleError(err)); }
+  }
+
+  static async analyzeContent(data: string, mimeType: string, prompt: string): Promise<string> {
+    try {
+      const ai = this.getAI();
+      const response = await ai.models.generateContent({
+        model: 'gemini-3-pro-preview',
+        contents: {
+          parts: [
+            { inlineData: { data: data.split(',')[1], mimeType } },
+            { text: prompt }
+          ]
+        }
+      });
+      return response.text || "No analysis available.";
+    } catch (err) { throw new Error(this.handleError(err)); }
+  }
+
+  /**
+   * Analyzes a voice sample and recommends a prebuilt voice using gemini-3-pro-preview.
+   */
+  static async analyzeVoice(sampleData: string, sampleMime: string, cleanSample: boolean): Promise<{ description: string, closestPrebuiltVoice: string }> {
+    try {
+      const ai = this.getAI();
+      const response = await ai.models.generateContent({
+        model: 'gemini-3-pro-preview',
+        contents: {
+          parts: [
+            { inlineData: { data: sampleData.split(',')[1], mimeType: sampleMime } },
+            { text: "Analyze this voice sample. Describe its characteristics (tone, pitch, accent) and suggest which of these prebuilt voices is the closest match: Kore, Puck, Charon, Fenrir, Orpheus, Zephyr, Aoide, Eos, Lyra, Atlas." }
+          ]
+        },
+        config: {
+          responseMimeType: "application/json",
+          responseSchema: {
+            type: Type.OBJECT,
+            properties: {
+              description: { type: Type.STRING },
+              closestPrebuiltVoice: { type: Type.STRING }
+            },
+            required: ["description", "closestPrebuiltVoice"]
+          }
+        }
+      });
+      return JSON.parse(response.text || "{}");
     } catch (err) { throw new Error(this.handleError(err)); }
   }
 
   static async generatePoster(scenario: string, aspectRatio: AspectRatio, style: PosterStyle, cast: CastMember[], alignment: Alignment, imageSize: ImageSize = ImageSize.K1) {
     try {
       const ai = this.getAI();
-      const isVillain = alignment === 'villain';
-      let styleDescriptor = "";
-      switch (style) {
-        case PosterStyle.PIXAR_CINEMATIC:
-          styleDescriptor = "Modern Pixar-style 3D render. Subsurface scattering, expressive eyes, master fur grooming, saturated colors, professional 3D animated movie aesthetic.";
-          break;
-        case PosterStyle.PIXAR_TOY_BOX:
-          styleDescriptor = "Tactile early-Pixar aesthetic. Plastic toy look, high specular highlights, rounded edges, studio lighting.";
-          break;
-        case PosterStyle.PIXAR_NATURE:
-          styleDescriptor = "Pixar nature 3D. Lush hyper-realistic organic environments, sun-dappled lighting, detailed animal characters.";
-          break;
-        case PosterStyle.EPIC_LEGEND:
-          styleDescriptor = isVillain ? "Dark high-fantasy, moody lighting, obsidian armor." : "High-fantasy epic, golden hour, ornate armor.";
-          break;
-        case PosterStyle.HEROIC_3D:
-          styleDescriptor = "Polished 3D animation. Soft global illumination, vibrant facial features.";
-          break;
-        case PosterStyle.SUPERHERO_COMIC:
-          styleDescriptor = "Dynamic comic book. Action, debris, bold typography.";
-          break;
-        case PosterStyle.URBAN_CINEMATIC:
-          styleDescriptor = "Gritty urban thriller. Night city, rain, atmosphere.";
-          break;
-        default: styleDescriptor = "Professional cinematic poster.";
-      }
-      const castDescriptions = cast.map(m => `CHARACTER: ${m.name} as "${m.alias.toUpperCase()}". Species: ${m.species}. Personality: ${m.traits}. OUTFIT: ${m.outfit}.`).join("\n");
-      const visualPrompt = `Blockbuster movie poster: ${alignment} group. CAST:\n${castDescriptions}\nSCENE: ${scenario}. STYLE: ${styleDescriptor}. Maintain strict animal anatomy.${this.getSafetyPrompt()}`;
-      const allReferenceImages = cast.flatMap(c => c.referenceImages);
-      const contents: any = { parts: allReferenceImages.map(img => ({ inlineData: { data: img.replace(/^data:image\/\w+;base64,/, ""), mimeType: 'image/png' } })) };
-      contents.parts.push({ text: visualPrompt });
-      const response = await ai.models.generateContent({ model: 'gemini-3-pro-image-preview', contents, config: { imageConfig: { aspectRatio, imageSize } } });
-      for (const part of response.candidates[0].content.parts) { if (part.inlineData) return `data:image/png;base64,${part.inlineData.data}`; }
-      throw new Error("No image data");
+      const castDescs = cast.map(m => `CHARACTER: ${m.name} as "${m.alias}". Species: ${m.species}. OUTFIT: ${m.outfit}.`).join("\n");
+      const visualPrompt = `Blockbuster movie poster: ${alignment}. CAST:\n${castDescs}\nSCENE: ${scenario}. STYLE: ${style}. ${this.getSafetyPrompt()}`;
+      
+      const parts: any[] = [];
+      cast.forEach(c => c.referenceImages.forEach(img => parts.push({ inlineData: { data: img.split(',')[1], mimeType: 'image/png' } })));
+      parts.push({ text: visualPrompt });
+
+      const response = await ai.models.generateContent({ 
+        model: 'gemini-3-pro-image-preview', 
+        contents: { parts }, 
+        config: { imageConfig: { aspectRatio, imageSize } } 
+      });
+
+      const part = response.candidates?.[0]?.content?.parts.find(p => p.inlineData);
+      if (part?.inlineData?.data) return `data:image/png;base64,${part.inlineData.data}`;
+      throw new Error("Synthesis failed.");
     } catch (err) { throw new Error(this.handleError(err)); }
   }
 
-  static async generateComic(profile: CharacterProfile, comicMeta: ComicMetadata, style: ComicStyle = ComicStyle.SHADOW_GUARDIAN, referenceImageBase64?: string) {
+  /**
+   * Generates a comic image using gemini-3-pro-image-preview.
+   */
+  static async generateComic(profile: CharacterProfile, meta: ComicMetadata, style: ComicStyle, sourceImageUrl: string): Promise<string> {
     try {
       const ai = this.getAI();
-      let styleText = style === ComicStyle.PIXAR_3D ? "Modern Pixar 3D style. Soft rounded shapes, vibrant colors, professional lighting." : style.toString();
-      const storyPrompt = `Professional comic strip, ${comicMeta.pages} panels. Hero ${profile.alias} vs ${comicMeta.villainName}. Style: ${styleText}. Maintain animal anatomy. Hero must match reference. Grid layout.${this.getSafetyPrompt()}`;
-      const parts: any[] = [];
-      if (referenceImageBase64) parts.push({ inlineData: { data: referenceImageBase64.replace(/^data:image\/\w+;base64,/, ""), mimeType: 'image/png' } });
-      parts.push({ text: storyPrompt });
-      const response = await ai.models.generateContent({ model: 'gemini-3-pro-image-preview', contents: { parts }, config: { imageConfig: { aspectRatio: AspectRatio.LANDSCAPE, imageSize: "1K" } } });
-      for (const part of response.candidates[0].content.parts) { if (part.inlineData) return `data:image/png;base64,${part.inlineData.data}`; }
-      throw new Error("No comic data");
+      const prompt = `4-panel comic strip. STYLE: ${style}. HERO: ${profile.petName} (${profile.species}, ${profile.alignment}) wearing ${profile.outfit}. VILLAIN: ${meta.villainName} (${meta.villainType}). PLOT: ${meta.villainTrait}. STORY ENDING: ${meta.storyEnding}. ${this.getSafetyPrompt()}`;
+      
+      const response = await ai.models.generateContent({
+        model: 'gemini-3-pro-image-preview',
+        contents: {
+          parts: [
+            { inlineData: { data: sourceImageUrl.split(',')[1], mimeType: 'image/png' } },
+            { text: prompt }
+          ]
+        },
+        config: { imageConfig: { aspectRatio: AspectRatio.LANDSCAPE } }
+      });
+
+      const part = response.candidates?.[0]?.content?.parts.find(p => p.inlineData);
+      if (part?.inlineData?.data) return `data:image/png;base64,${part.inlineData.data}`;
+      throw new Error("Comic synthesis failed.");
     } catch (err) { throw new Error(this.handleError(err)); }
   }
 
   static async generateVideo(prompt: string, aspectRatio: AspectRatio, resolution: Resolution, style: VideoStyle, referenceImages: string[] = [], baseVideoMeta?: any, transition?: StitchTransition, animationPreset: AnimationPreset = AnimationPreset.STABLE, startingFrameBase64?: string) {
     try {
       const ai = this.getAI();
-      let styleDescriptor = "";
-      switch (style) {
-        case VideoStyle.PIXAR_CINEMATIC: styleDescriptor = "Modern Pixar 3D animation. Subsurface scattering, vibrant saturated colors, ray-traced lighting."; break;
-        case VideoStyle.PIXAR_NATURE: styleDescriptor = "Pixar-style nature. Lush environments, charming animated animal protagonists."; break;
-        case VideoStyle.CINEMATIC: styleDescriptor = "Hyper-realistic cinema, anamorphic flares, shallow depth."; break;
-        case VideoStyle.COMIC_ANIMATION: styleDescriptor = "Motion comic, sequential panels, bold ink lines."; break;
-        default: styleDescriptor = "Realistic high-definition video.";
-      }
-      const enhancedPrompt = `STYLE: ${styleDescriptor}. MOTION: ${animationPreset}. ACTION: ${prompt}. Maintain strict animal anatomy and character consistency with references.${this.getSafetyPrompt()}`;
+      const apiKey = this.getApiKey();
+      const enhancedPrompt = `STYLE: ${style}. MOTION: ${animationPreset}. ACTION: ${prompt}. ${this.getSafetyPrompt()}`;
       
-      // Veo Guidelines:
-      // - veo-3.1-fast-generate-preview supports Text-to-Video and Image-to-Video (single image).
-      // - veo-3.1-generate-preview supports Video Editing, Extension, and Multiple Reference Images.
-      const hasMultipleRefs = referenceImages.length > 0;
-      const usePro = hasMultipleRefs || baseVideoMeta;
-      const modelName = usePro ? 'veo-3.1-generate-preview' : 'veo-3.1-fast-generate-preview';
-      
-      // Constraints for Multiple Reference Images: model 'veo-3.1-generate-preview', 16:9, 720p.
-      const finalAspectRatio = hasMultipleRefs ? '16:9' : aspectRatio;
-      const finalResolution = hasMultipleRefs ? '720p' : resolution;
-
-      const videoConfig: any = { 
-        numberOfVideos: 1, 
-        resolution: finalResolution, 
-        aspectRatio: finalAspectRatio 
-      };
-
       const params: any = { 
-        model: modelName, 
+        model: 'veo-3.1-fast-generate-preview', 
         prompt: enhancedPrompt, 
-        config: videoConfig 
+        config: { numberOfVideos: 1, resolution, aspectRatio } 
       };
-
-      if (baseVideoMeta) params.video = baseVideoMeta;
       
-      // Use "image" for single-image starting frame (Image-to-Video)
-      if (startingFrameBase64) {
-        params.image = { 
-          imageBytes: startingFrameBase64.replace(/^data:image\/\w+;base64,/, ""), 
-          mimeType: 'image/png' 
-        };
-      }
-      
-      // Use "referenceImages" for style/character references (up to 3)
-      if (hasMultipleRefs) {
-        params.config.referenceImages = referenceImages.map(img => ({ 
-          image: { 
-            imageBytes: img.replace(/^data:image\/\w+;base64,/, ""), 
-            mimeType: 'image/png' 
-          }, 
-          referenceType: 'ASSET' 
-        })).slice(0, 3);
-      }
+      if (startingFrameBase64) params.image = { imageBytes: startingFrameBase64.split(',')[1], mimeType: 'image/png' };
 
       let operation = await ai.models.generateVideos(params);
       while (!operation.done) { 
@@ -226,157 +213,145 @@ export class GeminiService {
       }
 
       const downloadLink = operation.response?.generatedVideos?.[0]?.video?.uri;
-      if (!downloadLink) throw new Error("Video synthesis failed. No download link provided.");
+      if (!downloadLink) throw new Error("Video synthesis failed.");
       
-      const res = await fetch(`${downloadLink}&key=${process.env.API_KEY}`);
-      if (!res.ok) throw new Error("Failed to download synthesized video.");
-      const blob: any = await res.blob();
+      const res = await fetch(`${downloadLink}&key=${apiKey}`);
+      const blob = await res.blob();
       return { url: URL.createObjectURL(blob), videoMeta: operation.response?.generatedVideos?.[0]?.video };
     } catch (err) { throw new Error(this.handleError(err)); }
   }
 
-  static async extendVideo(previousVideo: any, prompt: string, resolution: Resolution = Resolution.HD, aspectRatio: AspectRatio, referenceImages: string[] = [], transition: StitchTransition) {
-    try {
+  /**
+   * Extends a video using veo-3.1-generate-preview.
+   */
+  static async extendVideo(videoMeta: any, prompt: string, resolution: Resolution, aspectRatio: AspectRatio, referenceImages: string[], transition: StitchTransition) {
+     try {
       const ai = this.getAI();
-      const enhancedPrompt = `${prompt}. Transition: ${transition}. Maintain character consistency.${this.getSafetyPrompt()}`;
+      const apiKey = this.getApiKey();
       
       let operation = await ai.models.generateVideos({
         model: 'veo-3.1-generate-preview',
-        prompt: enhancedPrompt,
-        video: previousVideo,
+        prompt: `${prompt}. TRANSITION: ${transition}. ${this.getSafetyPrompt()}`,
+        video: videoMeta,
         config: {
           numberOfVideos: 1,
-          resolution: '720p', 
+          resolution: '720p',
           aspectRatio: aspectRatio,
         }
       });
 
       while (!operation.done) {
-        await new Promise(resolve => setTimeout(resolve, 10000));
-        operation = await ai.operations.getVideosOperation({ operation: operation });
+        await new Promise(r => setTimeout(r, 10000));
+        operation = await ai.operations.getVideosOperation({ operation });
       }
 
       const downloadLink = operation.response?.generatedVideos?.[0]?.video?.uri;
-      if (!downloadLink) throw new Error("Video extension failed");
-      const res = await fetch(`${downloadLink}&key=${process.env.API_KEY}`);
-      const blob: any = await res.blob();
+      if (!downloadLink) throw new Error("Video extension failed.");
+      
+      const res = await fetch(`${downloadLink}&key=${apiKey}`);
+      const blob = await res.blob();
       return { url: URL.createObjectURL(blob), videoMeta: operation.response?.generatedVideos?.[0]?.video };
-    } catch (err) {
-      throw new Error(this.handleError(err));
-    }
+    } catch (err) { throw new Error(this.handleError(err)); }
   }
 
-  static async stitchBridge(startFrame: string, endFrame: string, prompt: string, aspectRatio: AspectRatio, referenceImages: string[] = []) {
+  /**
+   * Stitches two frames together with a generated bridge using veo-3.1-fast-generate-preview.
+   */
+  static async stitchBridge(startFrame: string, endFrame: string, prompt: string, aspectRatio: AspectRatio, referenceImages: string[]) {
     try {
       const ai = this.getAI();
-      const enhancedPrompt = `Seamlessly transition between the start and end frame. ${prompt}. Maintain character consistency.${this.getSafetyPrompt()}`;
+      const apiKey = this.getApiKey();
       
       let operation = await ai.models.generateVideos({
         model: 'veo-3.1-fast-generate-preview',
-        prompt: enhancedPrompt,
+        prompt: `${prompt}. ${this.getSafetyPrompt()}`,
         image: {
-          imageBytes: startFrame.replace(/^data:image\/\w+;base64,/, ""),
-          mimeType: 'image/png',
+          imageBytes: startFrame.split(',')[1],
+          mimeType: 'image/png'
         },
         config: {
           numberOfVideos: 1,
           resolution: '720p',
+          aspectRatio,
           lastFrame: {
-            imageBytes: endFrame.replace(/^data:image\/\w+;base64,/, ""),
-            mimeType: 'image/png',
-          },
-          aspectRatio: aspectRatio,
+            imageBytes: endFrame.split(',')[1],
+            mimeType: 'image/png'
+          }
         }
       });
 
       while (!operation.done) {
-        await new Promise(resolve => setTimeout(resolve, 10000));
-        operation = await ai.operations.getVideosOperation({ operation: operation });
+        await new Promise(r => setTimeout(r, 10000));
+        operation = await ai.operations.getVideosOperation({ operation });
       }
 
       const downloadLink = operation.response?.generatedVideos?.[0]?.video?.uri;
-      if (!downloadLink) throw new Error("Stitching bridge failed");
-      const res = await fetch(`${downloadLink}&key=${process.env.API_KEY}`);
-      const blob: any = await res.blob();
+      if (!downloadLink) throw new Error("Stitch bridge failed.");
+      
+      const res = await fetch(`${downloadLink}&key=${apiKey}`);
+      const blob = await res.blob();
       return { url: URL.createObjectURL(blob), videoMeta: operation.response?.generatedVideos?.[0]?.video };
-    } catch (err) {
-      throw new Error(this.handleError(err));
-    }
-  }
-
-  static async editImage(source: string, prompt: string) {
-    try {
-      const ai = this.getAI();
-      const response = await ai.models.generateContent({ model: 'gemini-2.5-flash-image', contents: { parts: [{ inlineData: { data: source.replace(/^data:image\/\w+;base64,/, ""), mimeType: 'image/png' } }, { text: `Edit: ${prompt}. Keep animal anatomy.${this.getSafetyPrompt()}` }] } });
-      for (const part of response.candidates[0].content.parts) { if (part.inlineData) return `data:image/png;base64,${part.inlineData.data}`; }
-      throw new Error("No edited image");
     } catch (err) { throw new Error(this.handleError(err)); }
   }
 
-  static async analyzeContent(data: string, mimeType: string, prompt: string) {
+  /**
+   * Generates a book story and cover image.
+   */
+  static async generateBook(profile: CharacterProfile, meta: BookMetadata, style: BookStyle, sourceImageUrl?: string): Promise<{ url: string, story: any[] }> {
     try {
       const ai = this.getAI();
-      const base64Data = data.split(',')[1] || data;
-      const part = {
-        inlineData: {
-          data: base64Data,
-          mimeType: mimeType,
-        },
-      };
-      const response = await ai.models.generateContent({
-        model: 'gemini-3-pro-preview',
-        contents: { parts: [part, { text: `${prompt}${this.getSafetyPrompt()}` }] },
-      });
-      return response.text;
-    } catch (err) {
-      throw new Error(this.handleError(err));
-    }
-  }
-
-  static async analyzeVoice(audioData: string, mimeType: string, clean: boolean) {
-    try {
-      const ai = this.getAI();
-      const base64Data = audioData.split(',')[1] || audioData;
-      const cleanPrompt = clean ? "First, digitally clean the audio of background noise and static. Then, " : "";
-      const prompt = `${cleanPrompt}Analyze this voice sample for a cinematic production. Identify the following characteristics in JSON format: { "gender": "string", "ageGroup": "string", "pitch": "string", "tone": "string", "accent": "string", "closestPrebuiltVoice": "Kore|Puck|Charon|Fenrir|Orpheus|Zephyr|Aoide|Eos|Lyra|Atlas", "description": "short artistic description" }.${this.getSafetyPrompt()}`;
       
-      const response = await ai.models.generateContent({
-        model: 'gemini-3-pro-preview',
-        contents: { parts: [{ inlineData: { data: base64Data, mimeType } }, { text: prompt }] },
-        config: { responseMimeType: "application/json" }
-      });
-      return JSON.parse(response.text || "{}");
-    } catch (err) {
-      throw new Error(this.handleError(err));
-    }
-  }
-
-  static async generateBook(profile: CharacterProfile, bookMeta: BookMetadata, style: BookStyle, referenceImage?: string) {
-    try {
-      const ai = this.getAI();
-      const storyPrompt = `Write a cinematic ${bookMeta.genre} story outline for a book titled "${bookMeta.title}". Protagonist: ${profile.alias} (${profile.species}). Tone: ${bookMeta.tone}. Target Audience: ${bookMeta.targetAudience}. Generate ${bookMeta.chapters} chapters. Return JSON: { "chapters": [{ "title": "Chapter Title", "summary": "Detailed summary..." }] }${this.getSafetyPrompt()}`;
       const storyResponse = await ai.models.generateContent({
         model: 'gemini-3-flash-preview',
-        contents: [{ parts: [{ text: storyPrompt }] }],
-        config: { responseMimeType: "application/json" }
+        contents: `Write a ${meta.genre} story titled "${meta.title}" for ${meta.targetAudience}. Tone: ${meta.tone}. Chapters: ${meta.chapters}. Protagonist: ${profile.petName} (${profile.alias}).`,
+        config: {
+          responseMimeType: "application/json",
+          responseSchema: {
+            type: Type.ARRAY,
+            items: {
+              type: Type.OBJECT,
+              properties: {
+                title: { type: Type.STRING },
+                summary: { type: Type.STRING }
+              },
+              required: ["title", "summary"]
+            }
+          }
+        }
       });
-      const storyData = JSON.parse(storyResponse.text || '{"chapters": []}');
-      let styleText = style.toString();
-      const imagePrompt = `A high-end book cover illustration for "${bookMeta.title}". Style: ${styleText}. Featuring ${profile.alias} (${profile.species}) wearing ${profile.outfit || 'heroic gear'}. Cinematic lighting, professional book art.${this.getSafetyPrompt()}`;
+      const story = JSON.parse(storyResponse.text || "[]");
+
       const parts: any[] = [];
-      if (referenceImage) parts.push({ inlineData: { data: referenceImage.replace(/^data:image\/\w+;base64,/, ""), mimeType: 'image/png' } });
-      parts.push({ text: imagePrompt });
-      const imageResponse = await ai.models.generateContent({ model: 'gemini-3-pro-image-preview', contents: { parts }, config: { imageConfig: { aspectRatio: AspectRatio.PORTRAIT, imageSize: ImageSize.K1 } } });
-      let url = "";
-      for (const part of imageResponse.candidates[0].content.parts) { if (part.inlineData) { url = `data:image/png;base64,${part.inlineData.data}`; break; } }
-      return { url, story: storyData.chapters || [] };
+      if (sourceImageUrl) parts.push({ inlineData: { data: sourceImageUrl.split(',')[1], mimeType: 'image/png' } });
+      parts.push({ text: `Cinematic book cover: "${meta.title}". STYLE: ${style}. Protagonist: ${profile.petName} wearing ${profile.outfit}. ${this.getSafetyPrompt()}` });
+
+      const imageResponse = await ai.models.generateContent({
+        model: 'gemini-3-pro-image-preview',
+        contents: { parts },
+        config: { imageConfig: { aspectRatio: AspectRatio.PORTRAIT } }
+      });
+
+      const part = imageResponse.candidates?.[0]?.content?.parts.find(p => p.inlineData);
+      if (!part?.inlineData?.data) throw new Error("Cover synthesis failed.");
+      
+      return {
+        url: `data:image/png;base64,${part.inlineData.data}`,
+        story
+      };
     } catch (err) { throw new Error(this.handleError(err)); }
   }
 
   static async generateSpeech(text: string, voice: string = 'Kore') {
     try {
       const ai = this.getAI();
-      const response = await ai.models.generateContent({ model: "gemini-2.5-flash-preview-tts", contents: [{ parts: [{ text: `${text}${this.getSafetyPrompt()}` }] }], config: { responseModalities: [Modality.AUDIO], speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: voice } } } } });
+      const response = await ai.models.generateContent({ 
+        model: "gemini-2.5-flash-preview-tts", 
+        contents: [{ parts: [{ text: `Say clearly and with character: ${text}` }] }], 
+        config: { 
+          responseModalities: [Modality.AUDIO], 
+          speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: voice } } } 
+        } 
+      });
       return response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
     } catch (err) { throw new Error(this.handleError(err)); }
   }

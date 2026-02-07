@@ -1,5 +1,5 @@
 
-export type AppView = 'poster' | 'comic' | 'video' | 'edit' | 'analyze' | 'live' | 'speech' | 'history' | 'distribution' | 'avatar' | 'stitcher' | 'book' | 'settings' | 'analytics';
+export type AppView = 'home' | 'poster' | 'comic' | 'video' | 'edit' | 'analyze' | 'live' | 'speech' | 'history' | 'distribution' | 'avatar' | 'stitcher' | 'book' | 'settings' | 'analytics' | 'privacy' | 'terms';
 
 export type Alignment = 'hero' | 'villain';
 
@@ -18,6 +18,7 @@ export interface User {
   username: string;
   role: UserRole;
   credits: number;
+  lastCreditReset?: number;
   email?: string;
   avatarUrl?: string;
   cloudProvider: CloudProvider;

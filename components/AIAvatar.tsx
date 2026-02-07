@@ -1,9 +1,8 @@
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { GoogleGenAI } from '@google/genai';
 import { AppView, GeneratedContent } from '../types';
 
-// Fix: Define the missing AIAvatarProps interface to resolve the 'Cannot find name' error
 interface AIAvatarProps {
   activeView: AppView;
   history: GeneratedContent[];
@@ -15,20 +14,35 @@ export const AIAvatar: React.FC<AIAvatarProps> = ({ activeView, history }) => {
   const [userInput, setUserInput] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const getAIResponse = async (userMessage?: string, type: 'chat' | 'brainstorm' | 'guide' | 'review' = 'chat') => {
+  const getAIResponse = async (userMessage?: string) => {
     setLoading(true);
     try {
-      // Fix: Initialize GoogleGenAI right before use to ensure the latest API key is utilized
-      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+      // Safely obtain API Key
+      let apiKey = '';
+      try {
+        if (typeof process !== 'undefined' && process.env) {
+          apiKey = process.env.API_KEY || '';
+        }
+      } catch (e) {
+        console.warn("Process env inaccessible in AIAvatar");
+      }
+
+      if (!apiKey) {
+        setSuggestion("API ACCESS UNAVAILABLE. PLEASE CHECK SETUP!");
+        setLoading(false);
+        return;
+      }
+
+      const ai = new GoogleGenAI({ apiKey });
       const systemPrompt = `You are "CINE!", a high-energy comic book creative director.
       Tone: Loud, enthusiastic, uses comic book terminology like "PANEL!", "INKING!", "SPLASH PAGE!".
       Length: Keep it under 40 words.
-      Style: Use exclamation marks! All caps for emphasis on comic words.`;
+      Style: Use exclamation marks! ALL CAPS for emphasis on comic words.
+      Context: User is currently in the ${activeView} section.`;
 
-      // Fix: Use systemInstruction in the config parameter and access the .text property directly
       const response = await ai.models.generateContent({
         model: 'gemini-3-flash-preview',
-        contents: userMessage || "Give me a tip!",
+        contents: userMessage || "Give me a creative production tip!",
         config: {
           systemInstruction: systemPrompt,
         },
@@ -37,20 +51,21 @@ export const AIAvatar: React.FC<AIAvatarProps> = ({ activeView, history }) => {
       setSuggestion(response.text || "KEEP THE INK FLOWING!");
       setUserInput("");
     } catch (err) {
-      setSuggestion("MY INK IS CLOGGED! TRY AGAIN!");
+      console.error("AI Avatar Error:", err);
+      setSuggestion("MY INK IS CLOGGED! TRY AGAIN LATER!");
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    if (isOpen) getAIResponse(undefined, 'guide');
+    if (isOpen) getAIResponse();
   }, [activeView, isOpen]);
 
   const handleSend = (e: React.FormEvent) => {
     e.preventDefault();
     if (!userInput.trim()) return;
-    getAIResponse(userInput, 'chat');
+    getAIResponse(userInput);
   };
 
   return (
@@ -60,7 +75,7 @@ export const AIAvatar: React.FC<AIAvatarProps> = ({ activeView, history }) => {
           <div className="flex items-center gap-3 border-b-2 border-black pb-4 mb-4">
              <div>
                 <p className="text-sm font-comic text-black tracking-widest uppercase">CINE! THE DIRECTOR</p>
-                <div className="bg-cyan-400 text-[8px] font-black px-1.5 py-0.5 border border-black inline-block">ON AIR</div>
+                <div className="bg-cyan-400 text-[8px] font-black px-1.5 py-0.5 border border-black inline-block uppercase">On Air</div>
              </div>
           </div>
           
@@ -88,7 +103,8 @@ export const AIAvatar: React.FC<AIAvatarProps> = ({ activeView, history }) => {
             />
             <button 
               type="submit"
-              className="w-full py-2 bg-yellow-400 border-3 border-black text-[10px] font-black uppercase hover:bg-yellow-300 shadow-[2px_2px_0px_0px_#000]"
+              disabled={loading}
+              className="w-full py-2 bg-yellow-400 border-3 border-black text-[10px] font-black uppercase hover:bg-yellow-300 shadow-[2px_2px_0px_0px_#000] disabled:opacity-50"
             >
               SEND INTEL
             </button>

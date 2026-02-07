@@ -35,7 +35,7 @@ const STYLE_METADATA: Record<VideoStyle, { label: string, color: string, descrip
   [VideoStyle.PAPER_CUTOUT]: { label: 'CUTOUT', color: 'bg-rose-400', description: 'Layered paper cutout animation.' },
   [VideoStyle.KALEIDOSCOPE]: { label: 'KALEIDOSCOPE', color: 'bg-indigo-500', description: 'Mirrored geometric patterns.' },
   [VideoStyle.SYNTHWAVE]: { label: 'SYNTHWAVE', color: 'bg-fuchsia-900', description: '80s neon grid and chrome look.' },
-  [VideoStyle.INK_WASH]: { label: 'INK WASH', color: 'bg-zinc-950', description: 'Traditional Sumi-e brush motion.' },
+  [VideoStyle.INK_WASH]: { label: 'INK WASH', color: 'bg-zinc-950', description: 'Traditional Ink Wash motion.' },
   [VideoStyle.MACRO_NATURE]: { label: 'MACRO', color: 'bg-emerald-600', description: 'Extreme close-up nature detail.' },
   [VideoStyle.FANTASY_MAP]: { label: 'MAP', color: 'bg-orange-200', description: 'Moving ancient parchment illustrations.' },
 };
@@ -152,7 +152,7 @@ export const VideoGenerator: React.FC<VideoGeneratorProps> = ({ onGenerated, ava
               <textarea 
                 value={prompt} 
                 onChange={(e) => setPrompt(e.target.value)} 
-                placeholder="Describe the cinematic action... e.g. 'Hero jumps over the obstacle while looking back at camera'..." 
+                placeholder="Describe the cinematic action... e.g. 'Hero jumps over the obstacle'..." 
                 className="w-full h-32 bg-zinc-950 border-none rounded-2xl p-5 text-sm text-zinc-100 placeholder-zinc-800 focus:ring-1 focus:ring-indigo-500 transition-all resize-none font-medium leading-relaxed" 
               />
             </div>
@@ -204,7 +204,7 @@ export const VideoGenerator: React.FC<VideoGeneratorProps> = ({ onGenerated, ava
           <div className="p-8 bg-zinc-900/50 border border-zinc-800 rounded-[2rem] space-y-4">
              <h4 className="text-[10px] font-black text-zinc-600 uppercase tracking-[0.2em]">Director's Tip</h4>
              <p className="text-xs text-zinc-500 leading-relaxed italic">
-               "Using a **Comic Strip** as your Start Frame tells the AI to animate the sequence of events across panels into a cohesive video narrative."
+               "The **Anatomy Guard** is active. Characters will maintain their natural proportions and body mass regardless of the selected cinematic style."
              </p>
           </div>
         </div>
@@ -236,7 +236,6 @@ export const VideoGenerator: React.FC<VideoGeneratorProps> = ({ onGenerated, ava
                    <div className="absolute inset-0 border-4 border-indigo-500/30 border-dashed rounded-[2rem] animate-pulse pointer-events-none"></div>
                  )}
               </div>
-              <p className="text-[9px] text-zinc-600 mt-5 font-black uppercase tracking-tighter">Brings the selected character/comic to life in motion.</p>
             </div>
 
             {/* Character Consistency (References) */}
@@ -260,10 +259,6 @@ export const VideoGenerator: React.FC<VideoGeneratorProps> = ({ onGenerated, ava
                    </div>
                  ))}
               </div>
-              <p className="text-[9px] text-zinc-600 mt-5 font-black uppercase tracking-tighter">Ensures consistent character detail across every frame.</p>
-              {selectionMode === 'ref' && (
-                 <div className="absolute inset-0 border-4 border-purple-500/30 border-dashed rounded-[3rem] animate-pulse pointer-events-none"></div>
-              )}
             </div>
           </div>
 
@@ -277,43 +272,17 @@ export const VideoGenerator: React.FC<VideoGeneratorProps> = ({ onGenerated, ava
              </div>
              
              <div className="space-y-8">
-               {comics.length > 0 && (
-                 <div className="space-y-4">
-                   <p className="text-[9px] font-black text-zinc-700 uppercase tracking-widest">Story Sequences (Comics)</p>
-                   <div className="grid grid-cols-4 md:grid-cols-6 gap-4">
-                     {comics.map(img => (
-                       <AssetThumbnail 
-                        key={img.id} 
-                        img={img} 
-                        isSelected={startFrameId === img.id || referenceIds.includes(img.id)}
-                        isStart={startFrameId === img.id}
-                        isRef={referenceIds.includes(img.id)}
-                        onClick={() => handleLibraryClick(img.id)}
-                       />
-                     ))}
-                   </div>
-                 </div>
-               )}
-
-               <div className="space-y-4">
-                 <p className="text-[9px] font-black text-zinc-700 uppercase tracking-widest">Character Profiles (Posters & Stills)</p>
-                 <div className="grid grid-cols-4 md:grid-cols-6 gap-4">
-                   {otherImages.map(img => (
-                     <AssetThumbnail 
-                      key={img.id} 
-                      img={img} 
-                      isSelected={startFrameId === img.id || referenceIds.includes(img.id)}
-                      isStart={startFrameId === img.id}
-                      isRef={referenceIds.includes(img.id)}
-                      onClick={() => handleLibraryClick(img.id)}
-                     />
-                   ))}
-                   {availableImages.length === 0 && (
-                     <div className="col-span-full py-16 text-center bg-zinc-900/40 rounded-[2rem] border-2 border-dashed border-zinc-800 opacity-30">
-                        <p className="text-[10px] font-black uppercase tracking-widest">No production assets found.</p>
-                     </div>
-                   )}
-                 </div>
+               <div className="grid grid-cols-4 md:grid-cols-6 gap-4">
+                 {availableImages.map(img => (
+                   <AssetThumbnail 
+                    key={img.id} 
+                    img={img} 
+                    isSelected={startFrameId === img.id || referenceIds.includes(img.id)}
+                    isStart={startFrameId === img.id}
+                    isRef={referenceIds.includes(img.id)}
+                    onClick={() => handleLibraryClick(img.id)}
+                   />
+                 ))}
                </div>
              </div>
           </div>
@@ -327,8 +296,9 @@ export const VideoGenerator: React.FC<VideoGeneratorProps> = ({ onGenerated, ava
                </div>
                <h3 className="text-4xl font-bold mb-4 tracking-tight text-white uppercase font-cinematic">Temporal Synthesis</h3>
                <div className="max-w-md w-full space-y-6">
+                  <div className="bg-indigo-600/20 text-indigo-400 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest inline-block border border-indigo-500/30 mb-2">Anatomy Guard: Active</div>
                   <p className="text-zinc-500 text-sm leading-relaxed italic font-bold uppercase tracking-wide">
-                    {referenceIds.length > 0 ? "Synthesizing motion while locking character consistency references..." : "Developing motion sequence from start frame..."}
+                    Locked character proportions. Synchronizing motion while protecting natural anatomy...
                   </p>
                   <div className="h-1 w-full bg-zinc-900 rounded-full overflow-hidden border border-zinc-800">
                     <div className="h-full bg-indigo-600 animate-[progress_15s_ease-in-out_infinite]"></div>
@@ -372,11 +342,6 @@ const AssetThumbnail: React.FC<AssetThumbnailProps> = ({ img, isSelected, isStar
     }`}
   >
     <img src={img.url} className="w-full h-full object-cover" loading="lazy" />
-    <div className="absolute top-1 left-1 flex gap-1">
-      {img.type === 'comic' && (
-        <span className="bg-black/80 text-white text-[6px] px-1.5 py-0.5 rounded uppercase font-black tracking-widest border border-white/10">STORY</span>
-      )}
-    </div>
     {isStart && (
       <div className="absolute inset-0 bg-indigo-600/40 flex items-center justify-center backdrop-blur-[2px]">
          <span className="text-2xl drop-shadow-lg">🎬</span>
@@ -387,8 +352,5 @@ const AssetThumbnail: React.FC<AssetThumbnailProps> = ({ img, isSelected, isStar
          <span className="text-2xl drop-shadow-lg">🧬</span>
       </div>
     )}
-    <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent p-2">
-       <p className="text-[6px] text-white font-bold truncate opacity-80 uppercase tracking-tighter">{img.prompt}</p>
-    </div>
   </button>
 );

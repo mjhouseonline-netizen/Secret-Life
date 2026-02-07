@@ -14,9 +14,24 @@ export const LiveStudio: React.FC = () => {
   const nextStartTimeRef = useRef(0);
   const sourcesRef = useRef<Set<AudioBufferSourceNode>>(new Set());
 
-  const startSession = async () => {
+  const getApiKey = () => {
     try {
-      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+      if (typeof process !== 'undefined' && process.env && process.env.API_KEY && process.env.API_KEY !== 'undefined') {
+        return process.env.API_KEY;
+      }
+    } catch (e) {}
+    return '';
+  };
+
+  const startSession = async () => {
+    const apiKey = getApiKey();
+    if (!apiKey) {
+      setError("API KEY MISSING. PLEASE CONFIGURE STUDIO.");
+      return;
+    }
+
+    try {
+      const ai = new GoogleGenAI({ apiKey });
       const inputCtx = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 16000 });
       const outputCtx = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
       audioContextRef.current = inputCtx;
@@ -33,7 +48,12 @@ export const LiveStudio: React.FC = () => {
             scriptProcessor.onaudioprocess = (e) => {
               const inputData = e.inputBuffer.getChannelData(0);
               const pcmBlob = createBlob(inputData);
-              sessionPromise.then(session => session.sendRealtimeInput({ media: pcmBlob }));
+              // CRITICAL: Handle the promise and catch potential rejections to avoid "Uncaught" error
+              sessionPromise.then(session => {
+                session.sendRealtimeInput({ media: pcmBlob });
+              }).catch(err => {
+                console.error("Failed to send realtime input:", err);
+              });
             };
             source.connect(scriptProcessor);
             scriptProcessor.connect(inputCtx.destination);
@@ -60,12 +80,17 @@ export const LiveStudio: React.FC = () => {
             }
 
             if (msg.serverContent?.interrupted) {
-              sourcesRef.current.forEach(s => s.stop());
+              sourcesRef.current.forEach(s => {
+                try { s.stop(); } catch(e) {}
+              });
               sourcesRef.current.clear();
               nextStartTimeRef.current = 0;
             }
           },
-          onerror: (e) => setError("Connection error"),
+          onerror: (e) => {
+            console.error("Live session error:", e);
+            setError("Connection error");
+          },
           onclose: () => setIsActive(false),
         },
         config: {
@@ -80,7 +105,7 @@ export const LiveStudio: React.FC = () => {
       sessionRef.current = await sessionPromise;
       setIsActive(true);
     } catch (err: any) {
-      setError(err.message);
+      setError(err.message || "Failed to start live session");
     }
   };
 
